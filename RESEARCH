@@ -17,7 +17,9 @@ Emit:
 TODO: Needs a cron job to pull this on schedule and update server side into HamClock format. Maybe bash script?
 
 6. /NOAASpaceWX/xray.txt
-ray.txt from SWPC GOES X-ray JSON
+Source = https://services.swpc.noaa.gov/json/goes/primary/ and explicitly https://services.swpc.noaa.gov/json/goes/primary/xrays-1-day.json ?
+
+xray.txt from SWPC GOES X-ray JSON
 Fetch X-ray JSON
 For each record:
 timestamp as YYYY-MM-DDTHH:MM:SSZ
