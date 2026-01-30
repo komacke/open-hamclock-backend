@@ -1,0 +1,11 @@
+city=Franklin
+temperature_c=-2.39
+pressure_hPa=1027
+pressure_chg=-999
+humidity_percent=67
+wind_speed_mps=2.7
+wind_dir_name=S
+clouds=overcast clouds
+conditions=Clouds
+attribution=openweathermap.org
+timezone=-21600
