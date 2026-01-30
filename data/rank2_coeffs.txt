@@ -1,0 +1,14 @@
+# y = ax^2 + bx + c, where x = raw space weather value, y = small integer for ranking roughly -10..5
+# N.B. column 1 is SPCWX_t index and must be in this order.
+# hint: https://www.analyzemath.com/parabola/three_points_para_calc.html
+#       a        b       c
+0       0        0.05    -6              // Sunspot_N      60 => -3       200 => 4
+1       0        1e6     -2              // X-Ray          (C)1e-6 => -2  (M)1e-5 => 8
+2       0        0.1     -15             // Solar_Flux
+3       0        3.2     -8.8            // Planetary_K    1 => -5.6   4 =>  4   9 => 20
+4       0        1       -2              // Solar_Wind
+5       0        1       -20             // DRAP
+6       0        -0.8    -2              // Bz_Bt          0 => -2         -10 => 6
+7       0        3       -3              // NOAA_SpcWx     0 => -3   1 => 0  3 => 6
+8       0        0.16    -6              // AURORA         50 => 2         100 => 10
+9   -0.04       -0.2      3              // DST           -10 => 1  0 => 3  5 => 1
