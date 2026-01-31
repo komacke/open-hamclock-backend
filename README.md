@@ -82,6 +82,7 @@ You will need:
 - Cron (for scheduled data generation)
 - 
 # Install:
+```bash
   apt install \
   lighttpd \
   libwww-perl \
