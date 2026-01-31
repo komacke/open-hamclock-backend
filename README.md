@@ -13,6 +13,10 @@ MIT - this is free. Not for commercial use
 - [x] zlib decompress utilty script
 - [x] Generic backend to keep HamClocks alive beyond June 2026
 - [ ] Complete end-to-end working backend
+
+# Vision
+The goal is to make this as a drop-in replacement for the HamClock backend by replicating the same client/server responses with Perl CGI scripting and static files. We don't have access to the backend server source code so this is completely created by looking at the interfaces. To allow existing HamClock's running on Arduino to continue to work, we will setup a local DNS sinkhole to redirect to your local backend running at your home or office.
+
 # Compile Backend
 
 1. Use WSL2 and Ubuntu 22 LTS
