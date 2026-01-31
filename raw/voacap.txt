@@ -1,0 +1,8 @@
+curl http://clearskyinstitute.com/ham/HamClock/fetchVOACAPArea.pl?YEAR=2026&MONTH=1&UTC=15&TXLAT=<FILLIN>&TXLNG=<FILLIN>&PATH=0&WATTS=100&WIDTH=660&HEIGHT=330&MHZ=10.10&TOA=3.0&MODE=19&TOA=3.0 -o voacap.bmp
+
+HTTP/1.0 200 Ok
+Connection: close
+Remote_Addr: 68.251.144.107
+Content-Type: image/bmp; charset=ISO-8859-1
+
+<returns uncompressed bitmap>
