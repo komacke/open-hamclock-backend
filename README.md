@@ -3,6 +3,8 @@ Open Source and Faithful HamClock Backend Replacement. This is a community proje
 
 I wish the Downey family my deepest condolences.
 
+This is a WIP.
+
 # License
 MIT - this is free. Not for commercial use
 
@@ -69,7 +71,16 @@ The goal is to make this as a drop-in replacement for the HamClock backend by re
 - perl-XML-Feed
 - perl-HTML-Parser
 
+### Prerequisites
 
+This backend is designed to be lightweight and portable. It relies on a standard web server with CGI support and a small set of Perl modules.
+
+You will need:
+
+- Perl 5.10 or newer
+- `lighttpd` (recommended) or Apache httpd with CGI enabled
+- Cron (for scheduled data generation)
+- 
 # Install:
   apt install \
   lighttpd \
