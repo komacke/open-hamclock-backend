@@ -119,47 +119,31 @@ while ($html =~ m{
 
 binmode(STDOUT, ':encoding(UTF-8)');
 
-my $issues_url = 'https://hamweekly.com/rss/issues.xml';
+my $hamweekly_url = 'https://daily.hamweekly.com/atom.xml';
 
 my $ua = LWP::UserAgent->new(
     timeout => 10,
     agent   => 'Mozilla/5.0',
 );
 
-# Fetch issues RSS
-my $resp = $ua->get($issues_url);
-die "ISSUES FETCH FAILED: " . $resp->status_line . "\n"
+my $resp = $ua->get($hamweekly_url);
+die "HAMWEEKLY FETCH FAILED: " . $resp->status_line . "\n"
     unless $resp->is_success;
 
-my $rss = XML::RSS->new;
-$rss->parse($resp->decoded_content);
+my $feed = XML::Feed->parse(\$resp->decoded_content)
+    or die "HAMWEEKLY FEED PARSE FAILED\n";
 
-# Latest issue
-my $item = $rss->{items}[0]
-    or die "NO ISSUES FOUND\n";
+my $max = 5;
+my $count = 0;
 
-my $issue_url = $item->{link} || $item->{guid}
-    or die "NO ISSUE URL\n";
+for my $entry ($feed->entries) {
+    last if $count >= $max;
 
-# Fetch issue HTML
-my $issue_resp = $ua->get($issue_url);
-die "ISSUE FETCH FAILED: " . $issue_resp->status_line . "\n"
-    unless $issue_resp->is_success;
-
-my $html = $issue_resp->decoded_content;
-
-# Extract article titles
-while ($html =~ m{
-    <span\s+class="archive-headline">
-    \s*<a[^>]*>
-    (.*?)
-    </a>
-    \s*</span>
-}gxis) {
-    my $title = $1;
-    $title =~ s/<[^>]+>//g;
+    my $title = $entry->title // next;
     decode_entities($title);
     $title =~ s/\s+$//;
 
     print "HamWeekly.com: $title\n";
+    $count++;
 }
+
