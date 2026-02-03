@@ -85,6 +85,19 @@ HamClock requests about 40+ artifacts. I have locally replicated all of them tha
 - [x] zlib decompress utilty script
 - [ ] VOACAP map generator
 
+## Integration Testing Status
+- [x] GOES-16 X-Ray Pane
+- [x] Countries map
+- [x] Terrain map
+- [x] DRAP map
+- [ ] MUF-RT sort of working - needs shrinking and cropping
+- [x] Weather map
+- [x] Clouds map
+- [x] Aurora day
+- [ ] Aurora night - not working
+- [ ] ONTA - works, needs more de-duping; update 0.4 will have updated cache file and generation script
+- [x] 304a solar image
+
 ## Image Notes
 - SDO/f_304_170.bmp.z : This is a zlib compressed bitmap. It comes from here most likely: https://umbra.nascom.nasa.gov/images/latest.html and https://umbra.nascom.nasa.gov/images/latest_aia_304.gif
 - maps/Clouds : ftp://public.sos.noaa.gov/rt/sat/linear/raw/
