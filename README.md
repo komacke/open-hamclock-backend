@@ -152,28 +152,6 @@ You will need:
 - `lighttpd` (recommended) or Apache httpd with CGI enabled
 - Cron (for scheduled data generation)
   
-## Install:
-```bash
-  sudo tar xzf hamclock-backend.tar.gz -C /opt
-  sudo chown -R www-data:www-data /opt/hamclock-backend
-  sudo chmod +x /opt/hamclock-backend/htdocs/ham/HamClock/*.pl
-  sudo cp 50-hamclock.conf /etc/lighttpd/conf-available/50-hamclock.conf
-
-  # Update the server modules inside your lighttpd configuration file located at: /etc/lighttpd/lighttpd.conf
-  # Only change should be the "mod_cgi" module at the end:
-      server.modules = (
-          "mod_indexfile",
-          "mod_access",
-          "mod_alias",
-          "mod_redirect",
-          "mod_cgi",
-      )
-
-  sudo lighttpd -tt -f /etc/lighttpd/lighttpd.conf
-  sudo lighttpd-enable-mod hamclock
-  sudo systemctl restart lighttpd
-  # add crontab as user www-data and described in scripts/crontab
-```
 ## Testing
 
 After install, you can verify any script is working by using sudo -u www-data /opt/hamclock/scripts/<scriptname> <optional-param>
