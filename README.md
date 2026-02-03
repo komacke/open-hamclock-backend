@@ -114,6 +114,7 @@ Images with N means Night and D means Day
 ## Requirements and Install
 
 ### Dependency Install
+- sudo apt install -y jq
 - sudo apt install -y perl
 - sudo apt install -y lighttpd
 - sudo apt install -y imagemagick
@@ -125,9 +126,6 @@ Images with N means Night and D means Day
 - sudo apt install -y libeccodes-dev
 - sudo apt install -y libg2c-dev
 - sudo apt install -y libpng-dev
-- pip install pygrib
-- pip install matplotlib
-- pip install numpy
 - sudo apt install -y python3-pyproj
 - sudo apt install -y libg2c-dev
 - sudo apt install -y libeccodes-dev
@@ -136,6 +134,9 @@ Images with N means Night and D means Day
 - sudo apt install -y python3-dev
 - sudo apt install -y build-essential gfortran gcc make libc6-dev \
   libx11-dev libxaw7-dev libxmu-dev libxt-dev libmotif-dev wget (needed for VOACAPL)
+- pip install pygrib
+- pip install matplotlib
+- pip install numpy
 - sudo wget https://downloads.sourceforge.net/project/voacap/vocap/voacapl-0.7.6.tar.gz
   Note: VOACAPL install instructions in work
 
