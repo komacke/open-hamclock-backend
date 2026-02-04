@@ -196,6 +196,6 @@ Most cron-jobs will log to /opt/hamclock-backend/logs
 - Every hour: /opt/hamclock-backend/scripts/gen_dst.sh
 - Every 30 minutes: /opt/hamclock-backend/scripts/gen_aurora.sh
 - Every 5 minutes: /opt/hamclock-backend/scripts/gen_onta.pl
-- Every 5 minutes: /opt/hamclock-backend/scripts/gen_drap.sh
 - Every 5 minutes: /opt/hamclock-backend/scripts/bzgen.sh
+- Every 3 minutes: /opt/hamclock-backend/scripts/gen_drap.sh
 - Once per minute: /opt/hamclock-backend/scripts/genxray.pl
