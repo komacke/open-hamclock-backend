@@ -93,26 +93,23 @@ HamClock requests about 40+ artifacts. I have locally replicated all of them tha
 - [x] Countries map
 - [x] Terrain map
 - [x] DRAP map
-- [ ] MUF-RT sort of working - needs shrinking and cropping
+- [x] SDO imagery
+- [ ] MUF-RT
 - [x] Weather map
 - [x] Clouds map
-- [x] Aurora day
-- [ ] Aurora night - not working
-- [ ] ONTA - works, needs more de-duping; update 0.4 will have updated cache file and generation script
-- [x] 304a solar image
-- [ ] SSN data - invalid - fixed in next version. Need new script to test
-- [x] Solar wind
-- [ ] DRAP data - invalid
-- [ ] Planetary k - invalid
+- [x] Aurora Day
+- [ ] Aurora Night
+- [x] Parks on the Air
+- [x] 
+- [x] SSN
+- [x] Solar Wind
+- [x] DRAP 
+- [x] Planetary Kp
 - [x] Solar flux
-
-## Image Notes
-- SDO/f_304_170.bmp.z : This is a zlib compressed bitmap. It comes from here most likely: https://umbra.nascom.nasa.gov/images/latest.html and https://umbra.nascom.nasa.gov/images/latest_aia_304.gif
-- maps/Clouds : ftp://public.sos.noaa.gov/rt/sat/linear/raw/
-  
-Decompressing the images for viewing can be done using $ zlib-flate -uncompress < filename.bmp.z > newfilename.bmp
-
-Images with N means Night and D means Day
+- [ ] Amateur Satellites
+- [ ] PSK Reporter WSPR
+- [ ] RBN
+- [x] PSK Reporter All
 
 ## Requirements and Install
 
@@ -133,6 +130,7 @@ Images with N means Night and D means Day
 - sudo apt install -y libeccodes-dev
 - sudo apt install -y libtext-csv-xs-perl
 - sudo apt install -y librsvg2-bin
+- sudo apt install -y ffmpeg
 - sudo apt install -y python3
 - sudo apt install -y python3-pip
 - sudo apt install -y python3-pyproj
