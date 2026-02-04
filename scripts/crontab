@@ -35,7 +35,7 @@
 35 0 * * * /opt/hamclock-backend/scripts/merge_dxpeditions.pl >> /opt/hamclock-backend/logs/merge_dxpeditions.log 2>&1
 17 */12 * * * /opt/hamclock-backend/scripts/gen_kindex.pl >> /opt/hamclock-backend/logs/gen_kindex.log 2>&1
 0 */3 * * * /opt/hamclock-backend/scripts/build_esats.pl >> /opt/hamclock-backend/logs/build_esats.log 2>&1
-*/10 * * * * /opt/hamclock-backend/scripts/update_clouds_maps.sh >> /opt/hamclock-backend/logs/update_clouds_maps.log 2>&1
+*/10 * * * * /opt/hamclock-backend/scripts/update_cloud_maps.sh >> /opt/hamclock-backend/logs/update_cloud_maps.log 2>&1
 */5 * * * * /opt/hamclock-backend/scripts/update_drap_maps.sh >> /opt/hamclock-backend/logs/update_drap_maps.log 2>&1
 6 */1 * * * /opt/hamclock-backend/scripts/gen_dst.sh >> /opt/hamclock-backend/logs/gen_dst.log 2>&1
 */30 * * * * /opt/hamclock-backend/scripts/gen_aurora.sh >> /opt/hamclock-backend/logs/gen_aurora.log 2>&1
