@@ -102,9 +102,9 @@ if (defined $lat && defined $lng) {
 # -------------------------
 # Output (HamClock format)
 # -------------------------
-#print "HTTP/1.0 200 Ok\r\n";
-#print "Content-Type: text/plain; charset=ISO-8859-1\r\n";
-#print "Connection: close\r\n\r\n";
+print "HTTP/1.0 200 Ok\r\n";
+print "Content-Type: text/plain; charset=ISO-8859-1\r\n";
+print "Connection: close\r\n\r\n";
 
 print "city=$wx{city}\n";
 print "temperature_c=$wx{temperature_c}\n";
