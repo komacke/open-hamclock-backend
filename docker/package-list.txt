@@ -1,0 +1,30 @@
+# empty lines and lines beginning with a # are ignored. Note that comments within lines are not ignored
+
+# temp for development
+vim
+
+# packages required by hamclock-backend
+curl
+jq
+cron
+lighttpd
+media-types
+imagemagick
+python3
+build-essential
+gfortran
+python3-numpy
+python3-pyproj
+python3-dev
+python3-grib
+python3-matplotlib
+libeccodes-dev
+libg2c-dev
+libpng-dev
+libwww-perl
+libjson-perl
+libxml-rss-perl
+libxml-feed-perl
+libhtml-parser-perl
+
+# dependencies pulled in by hamclock-backend package list
