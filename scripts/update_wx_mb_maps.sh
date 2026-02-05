@@ -1,33 +1,54 @@
 #!/usr/bin/env bash
+# update_wx_mb_maps.sh
+#
+# Generates HamClock Wx-mB maps in multiple sizes, pairing each WxH output with the
+# corresponding WxH Countries base bitmap.
+#
+# Outputs (per size):
+#   map-D-<WxH>-Wx-mB.bmp(.z)
+#   map-N-<WxH>-Wx-mB.bmp(.z)   (only if map-N-<WxH>-Countries.bmp.z exists)
+#
+# Requires: curl, python3, ImageMagick not required, pygrib installed for python3.
+
 set -euo pipefail
+export LC_ALL=C
 
 OUTDIR="/opt/hamclock-backend/htdocs/ham/HamClock/maps"
-BASE_COUNTRIES="$OUTDIR/map-D-660x330-Countries.bmp.z"
-export MPLCONFIGDIR="/opt/hamclock-backend/tmp"
+TMPROOT="/opt/hamclock-backend/tmp"
+export MPLCONFIGDIR="$TMPROOT/mpl"
 
-W=660
-H=330
+# Your target sizes
+SIZES=(
+  "660x330"
+  "1320x660"
+  "1980x990"
+  "2640x1320"
+  "3960x1980"
+  "5280x2640"
+  "5940x2970"
+  "7920x3960"
+)
 
 # NOMADS GFS 0.25° subset endpoint (GRIB2 filter)
 NOMADS_FILTER="https://nomads.ncep.noaa.gov/cgi-bin/filter_gfs_0p25.pl"
 
-TMPDIR="$(mktemp -d)"
-trap 'rm -rf "$TMPDIR"' EXIT
-
 need() { command -v "$1" >/dev/null 2>&1 || { echo "ERROR: missing $1" >&2; exit 1; }; }
 need curl
 need python3
+mkdir -p "$OUTDIR" "$TMPROOT" "$MPLCONFIGDIR"
 
-mkdir -p "$OUTDIR"
-test -f "$BASE_COUNTRIES" || { echo "ERROR: missing $BASE_COUNTRIES" >&2; exit 1; }
+TMPDIR="$(mktemp -d -p "$TMPROOT" wxmb.XXXXXX)"
+trap 'rm -rf "$TMPDIR"' EXIT
 
-# Pick latest available GFS cycle by trying (today UTC, yesterday UTC) * (18,12,06,00)
-# We download analysis hour f000 and only the vars/levels we need.
+# Download latest available GFS cycle (f000) with only needed vars/levels
 pick_and_download() {
   local ymd="$1" hh="$2"
   local file="gfs.t${hh}z.pgrb2.0p25.f000"
   local dir="%2Fgfs.${ymd}%2F${hh}%2Fatmos"
 
+  # Request:
+  # - PRMSL at mean sea level
+  # - UGRD/VGRD at 10 m above ground
   local url="${NOMADS_FILTER}?file=${file}"\
 "&lev_mean_sea_level=on&lev_10_m_above_ground=on"\
 "&var_PRMSL=on&var_UGRD=on&var_VGRD=on"\
@@ -35,8 +56,8 @@ pick_and_download() {
 "&dir=${dir}"
 
   echo "Trying GFS ${ymd} ${hh}Z ..."
-#  if curl -fsS --retry 2 --retry-delay 2 "$url" -o "$TMPDIR/gfs.grb2"; then
-  if curl -fsS -A "open-hamclock-backend/1.0" --retry 2 --retry-delay 2 "$url" -o "$TMPDIR/gfs.grb2"; then
+  if curl -fsS -A "open-hamclock-backend/1.0" --retry 2 --retry-delay 2 \
+      "$url" -o "$TMPDIR/gfs.grb2"; then
     echo "Downloaded: ${file} (${ymd} ${hh}Z)"
     echo "${ymd} ${hh}" > "$TMPDIR/gfs_cycle.txt"
     return 0
@@ -44,11 +65,10 @@ pick_and_download() {
   return 1
 }
 
-# UTC dates
 TODAY_UTC="$(date -u +%Y%m%d)"
 YESTERDAY_UTC="$(date -u -d '1 day ago' +%Y%m%d)"
-
 CYCLES=(18 12 06 00)
+
 downloaded=0
 for d in "$TODAY_UTC" "$YESTERDAY_UTC"; do
   for hh in "${CYCLES[@]}"; do
@@ -64,7 +84,11 @@ if [[ "$downloaded" -ne 1 ]]; then
   exit 1
 fi
 
-python3 - <<'PY' "$TMPDIR/gfs.grb2" "$BASE_COUNTRIES" "$OUTDIR" "$W" "$H"
+# Render a Wx-mB map for one size + one base
+render_one() {
+  local tag="$1" W="$2" H="$3" base="$4"
+
+  python3 - <<'PY' "$TMPDIR/gfs.grb2" "$base" "$OUTDIR" "$tag" "$W" "$H"
 import sys, zlib, struct
 import numpy as np
 import matplotlib
@@ -72,7 +96,7 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import pygrib
 
-grb_path, base_path, outdir, W, H = sys.argv[1:]
+grb_path, base_path, outdir, tag, W, H = sys.argv[1:]
 W = int(W); H = int(H)
 
 def zread(path: str) -> bytes:
@@ -119,7 +143,6 @@ def write_bmp_v4_rgb565_topdown(path: str, arr565: np.ndarray):
     bfOffBits = 122
     pix = arr565.astype("<u2").tobytes()
     bfSize = bfOffBits + len(pix)
-
     filehdr = struct.pack("<2sIHHI", b"BM", bfSize, 0, 0, bfOffBits)
 
     biSize = 108
@@ -154,89 +177,112 @@ def resize_nn(arr: np.ndarray, out_h: int, out_w: int) -> np.ndarray:
     xi = (np.linspace(0, in_w-1, out_w)).astype(np.int32)
     return arr[yi][:, xi]
 
-# --- Load base map (countries) ---
+# Load size-matched countries base (must already be WxH)
 bw, bh, base565 = read_bmp_v4_rgb565_topdown(zread(base_path))
-base_rgb = rgb565_to_rgb888(base565)
 if (bw, bh) != (W, H):
-    # Should already be 660x330, but keep safe
-    base_rgb = base_rgb[np.linspace(0, bh-1, H).astype(int)][:, np.linspace(0, bw-1, W).astype(int)]
+    raise SystemExit(f"ERROR: base map is {bw}x{bh}, expected {W}x{H}: {base_path}")
+base_rgb = rgb565_to_rgb888(base565)
 
-# --- Read GFS fields ---
+# Read GFS fields
 grbs = pygrib.open(grb_path)
 
-# Mean sea level pressure (Pa)
-mslp = grbs.select(shortName="prmsl")[0]
-pr = mslp.values  # 2D
-# Winds at 10m (m/s)
-u10 = grbs.select(shortName="10u")[0].values
-v10 = grbs.select(shortName="10v")[0].values
+# Pressure (Pa) -> mB/hPa
+pr = grbs.select(shortName="prmsl")[0].values / 100.0
 
-# Some builds use UGRD/VGRD names instead of 10u/10v; fallback
+# Wind at 10m: some files use 10u/10v, others ugrd/vgrd at 10m.
+u10 = v10 = None
+try:
+    u10 = grbs.select(shortName="10u")[0].values
+    v10 = grbs.select(shortName="10v")[0].values
+except Exception:
+    pass
+
 if u10 is None or v10 is None:
-    u10 = grbs.select(shortName="ugrd", level=10)[0].values
-    v10 = grbs.select(shortName="vgrd", level=10)[0].values
+    # Prefer explicit level=10 (10 m above ground) if present
+    try:
+        u10 = grbs.select(shortName="ugrd", level=10)[0].values
+        v10 = grbs.select(shortName="vgrd", level=10)[0].values
+    except Exception:
+        # Fallback: first ugrd/vgrd in the filtered file
+        u10 = grbs.select(shortName="ugrd")[0].values
+        v10 = grbs.select(shortName="vgrd")[0].values
 
 grbs.close()
 
-# Convert pressure to mB/hPa
-pr_mb = pr / 100.0
+# Resample model grid to output size
+pr_s = resize_nn(pr,  H, W)
+u_s  = resize_nn(u10, H, W)
+v_s  = resize_nn(v10, H, W)
 
-# Resample model grid to 330x660 for plotting in image coordinates
-pr_s = resize_nn(pr_mb, H, W)
-u_s  = resize_nn(u10,   H, W)
-v_s  = resize_nn(v10,   H, W)
+# Scale annotation density with resolution (prevents huge maps from looking sparse)
+scale = max(W / 660.0, 1.0)
+lw = 0.6 * (scale ** 0.6)
+fs = max(6.0 * (scale ** 0.6), 6.0)
+step = int(max(22 * scale, 22))
+qwidth = 0.0012 / scale
+qscale = 55 * scale
 
-# --- Render on top of countries map ---
 fig = plt.figure(figsize=(W/100, H/100), dpi=100)
 ax = plt.axes([0,0,1,1])
 ax.set_axis_off()
-
 ax.imshow(base_rgb, origin="upper")
 
-# Isobars: choose a sane range and step
-# Adjust these if you want denser/sparser lines.
 levels = np.arange(960, 1045, 4)
-cs = ax.contour(pr_s, levels=levels, colors="white", linewidths=0.6, alpha=0.95)
+cs = ax.contour(pr_s, levels=levels, colors="white", linewidths=lw, alpha=0.95)
+ax.clabel(cs, inline=True, fmt="%d", fontsize=fs, colors="white")
 
-# Label a subset of isobars (white text)
-ax.clabel(cs, inline=True, fmt="%d", fontsize=6, colors="white")
-
-# Optional: winds (sparse) - keep subtle
-step = 22
 yy, xx = np.mgrid[0:H:step, 0:W:step]
-ax.quiver(xx, yy, u_s[0:H:step, 0:W:step], -v_s[0:H:step, 0:W:step],
-          color="white", angles="xy", scale_units="xy", scale=55, width=0.0012, alpha=0.55)
-
-#fig.canvas.draw()
-#img = np.frombuffer(fig.canvas.tostring_rgb(), dtype=np.uint8).reshape(H, W, 3)
-#plt.close(fig)
+ax.quiver(xx, yy,
+          u_s[0:H:step, 0:W:step], -v_s[0:H:step, 0:W:step],
+          color="white", angles="xy", scale_units="xy", scale=qscale, width=qwidth, alpha=0.55)
 
 fig.canvas.draw()
-
-# Portable extraction for Agg across matplotlib versions
 wpx, hpx = fig.canvas.get_width_height()
 rgba = np.frombuffer(fig.canvas.buffer_rgba(), dtype=np.uint8).reshape(hpx, wpx, 4)
-img = rgba[:, :, :3].copy()  # RGB, drop alpha
-
+img = rgba[:, :, :3].copy()
 plt.close(fig)
 
-# Safety clamp in case size ever drifts
-if img.shape[0] != H or img.shape[1] != W:
-    img = img[np.linspace(0, img.shape[0]-1, H).astype(int)][:,
-              np.linspace(0, img.shape[1]-1, W).astype(int)]
-
-# Write HamClock BMPv4 RGB565 top-down + .z
-out_bmp = f"{outdir}/map-D-{W}x{H}-Wx-mB.bmp"
+# Write HamClock BMPv4 RGB565 top-down + zlib .z
+out_bmp = f"{outdir}/map-{tag}-{W}x{H}-Wx-mB.bmp"
 out_z   = out_bmp + ".z"
 
 arr565 = rgb888_to_rgb565(img)
 write_bmp_v4_rgb565_topdown(out_bmp, arr565)
 zwrite(out_z, open(out_bmp, "rb").read())
 
-print("OK: wrote", out_z)
+print("OK:", out_z)
 PY
+}
 
-chmod 0644 \
-  "$OUTDIR/map-D-${W}x${H}-Wx-mB.bmp" \
-  "$OUTDIR/map-D-${W}x${H}-Wx-mB.bmp.z"
+for wh in "${SIZES[@]}"; do
+  W="${wh%x*}"
+  H="${wh#*x}"
+
+  DAY_BASE="$OUTDIR/map-D-${W}x${H}-Countries.bmp.z"
+  [[ -f "$DAY_BASE" ]] || { echo "ERROR: missing $DAY_BASE" >&2; exit 1; }
+
+  echo "Rendering Wx-mB Day ${W}x${H} (base: $(basename "$DAY_BASE"))"
+  render_one "D" "$W" "$H" "$DAY_BASE"
+
+  NIGHT_BASE="$OUTDIR/map-N-${W}x${H}-Countries.bmp.z"
+  if [[ -f "$NIGHT_BASE" ]]; then
+    echo "Rendering Wx-mB Night ${W}x${H} (base: $(basename "$NIGHT_BASE"))"
+    render_one "N" "$W" "$H" "$NIGHT_BASE"
+  else
+    echo "Skipping Night ${W}x${H} (missing $(basename "$NIGHT_BASE"))"
+  fi
+
+  chmod 0644 \
+    "$OUTDIR/map-D-${W}x${H}-Wx-mB.bmp" \
+    "$OUTDIR/map-D-${W}x${H}-Wx-mB.bmp.z" \
+    2>/dev/null || true
+
+  if [[ -f "$OUTDIR/map-N-${W}x${H}-Wx-mB.bmp" ]]; then
+    chmod 0644 \
+      "$OUTDIR/map-N-${W}x${H}-Wx-mB.bmp" \
+      "$OUTDIR/map-N-${W}x${H}-Wx-mB.bmp.z"
+  fi
+done
+
+echo "OK: Wx-mB maps updated in $OUTDIR"
 
