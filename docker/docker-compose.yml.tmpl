@@ -1,10 +1,10 @@
 services:
   web:
-    container_name: hamclock-be
+    container_name: __IMAGE_BASE__
     image: __IMAGE__
     restart: unless-stopped
     networks:
-      - hamclock-be
+      - __IMAGE_BASE__
     ports:
       - :80:80
     healthcheck:
@@ -17,11 +17,11 @@ services:
         max-file: "2"
 
 networks:
-  hamclock-be:
+  __IMAGE_BASE__:
     driver: bridge
-    name: hamclock-be
+    name: __IMAGE_BASE__
     enable_ipv6: true
     ipam:
      driver: default
     driver_opts:
-      com.docker.network.bridge.name: hamclock-be
+      com.docker.network.bridge.name: __IMAGE_BASE__
