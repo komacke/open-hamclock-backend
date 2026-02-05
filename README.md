@@ -85,7 +85,7 @@ Note: Anything under maps/ is considered a "Core Map" in HamClock
 - [x] maps/Countries*
 - [x] maps/Wx-mB*
 - [ ] maps/Aurora (Partial Sizes)
-- [ ] maps/DRAP (Partial Sizes)
+- [x] maps/DRAP
 - [ ] maps/MUF-RT (Partial Sizes)
 - [ ] maps/Terrain (Partial Sizes)
 - [x] SDO/*
