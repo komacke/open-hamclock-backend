@@ -147,6 +147,9 @@ echo -e "${BLU}==> Creating directories${NC}"
 
 sudo mkdir -p \
  /opt/hamclock-backend/tmp \
+ /opt/hamclock-backend/logs \
+ /opt/hamclock-backend/cache \
+ /opt/hamclock-backend/data \
  /opt/hamclock-backend/htdocs/ham/HamClock
 
 sudo chown -R www-data:www-data /opt/hamclock-backend
