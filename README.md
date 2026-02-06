@@ -169,6 +169,11 @@ Note: Installer script should take care of these dependencies. If not, you can m
 - sudo apt install -y python3-pip
 - sudo apt install -y python3-pyproj
 - sudo apt install -y python3-dev
+\# Canonical Ubuntu Way
+- sudo apt install -y python3-matplotlib
+- sudo apt install -y python3-pygrib
+- sudo apt install -y python3-grib
+\# Canonical Ubuntu Way
 - sudo apt install -y build-essential gfortran gcc make libc6-dev \\\
 libx11-dev libxaw7-dev libxmu-dev libxt-dev libmotif-dev wget (needed for VOACAPL)
 - pip install numpy
