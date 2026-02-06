@@ -3,6 +3,7 @@ set -euo pipefail
 
 REPO="https://github.com/BrianWilkinsFL/open-hamclock-backend.git"
 BASE="/opt/hamclock-backend"
+VENV="$BASE/venv"
 
 # ---------- colors ----------
 RED='\033[0;31m'
@@ -51,7 +52,7 @@ EOF
 echo -e "${GRN}RF • Space • Propagation • Maps${NC}"
 echo
 
-STEPS=6
+STEPS=8
 STEP=0
 
 # ---------- sanity ----------
@@ -68,75 +69,62 @@ sudo apt-get update >/dev/null &
 spinner $!
 
 sudo apt-get install -y \
-jq \
-perl \
-lighttpd \
-imagemagick \
-libwww-perl \
-libjson-perl \
-libxml-rss-perl \
-libxml-feed-perl \
-libhtml-parser-perl \
-libeccodes-dev \
-libpng-dev \
-libtext-csv-xs-perl \
-librsvg2-bin \
-ffmpeg \
-python3 \
-python3-pip \
-python3-pyproj \
-python3-dev \
-build-essential \
-gfortran \
-gcc \
-make \
-libc6-dev \
-libx11-dev \
-libxaw7-dev \
-libxmu-dev \
-libxt-dev \
-libmotif-dev \
-wget >/dev/null &
+git jq curl perl lighttpd imagemagick \
+libwww-perl libjson-perl libxml-rss-perl libxml-feed-perl libhtml-parser-perl \
+libeccodes-dev libpng-dev libtext-csv-xs-perl librsvg2-bin ffmpeg \
+python3 python3-venv python3-dev build-essential gfortran gcc make libc6-dev \
+libx11-dev libxaw7-dev libxmu-dev libxt-dev libmotif-dev wget >/dev/null &
 spinner $!
 
-# ---- pip AFTER apt ----
-
-# ---------- python venv ----------
-echo -e "${BLU}==> Creating Python virtualenv${NC}"
-
-sudo apt-get install -y python3-venv >/dev/null
-
-VENV=/opt/hamclock-backend/venv
-
-sudo -u www-data python3 -m venv $VENV
-
-sudo -u www-data $VENV/bin/pip install --upgrade pip
-
-sudo -u www-data $VENV/bin/pip install \
-numpy \
-pygrib \
-matplotlib >/dev/null &
-spinner $!
-
-# ---------- clone ----------
+# ---------- forced redeploy ----------
 STEP=$((STEP+1)); progress $STEP $STEPS
-echo -e "${BLU}==> Fetching OHB${NC}"
+echo -e "${BLU}==> Fetching OHB (forced redeploy)${NC}"
 
-if [ ! -d "$BASE" ]; then
-  sudo git clone "$REPO" "$BASE" >/dev/null &
+sudo mkdir -p "$BASE"
+
+if [ -d "$BASE/.git" ]; then
+  sudo git -C "$BASE" reset --hard HEAD >/dev/null
+  sudo git -C "$BASE" clean -fd >/dev/null
+  sudo git -C "$BASE" pull >/dev/null &
   spinner $!
 else
-  sudo git -C "$BASE" pull >/dev/null &
+  sudo rm -rf "$BASE"/*
+  sudo git clone "$REPO" "$BASE" >/dev/null &
   spinner $!
 fi
 
+# git housekeeping
+sudo rm -f "$BASE/.git/gc.log" || true
+sudo git -C "$BASE" prune >/dev/null || true
+sudo git -C "$BASE" gc --prune=now >/dev/null || true
+
+sudo chown -R www-data:www-data "$BASE"
+
+# ---------- python venv ----------
+STEP=$((STEP+1)); progress $STEP $STEPS
+echo -e "${BLU}==> Creating Python virtualenv${NC}"
+
+sudo -u www-data mkdir -p "$BASE/tmp/pip-cache"
+
+sudo -u www-data env HOME="$BASE/tmp" XDG_CACHE_HOME="$BASE/tmp" PIP_CACHE_DIR="$BASE/tmp/pip-cache" \
+python3 -m venv "$VENV"
+
+sudo -u www-data env HOME="$BASE/tmp" XDG_CACHE_HOME="$BASE/tmp" PIP_CACHE_DIR="$BASE/tmp/pip-cache" \
+"$VENV/bin/pip" install --upgrade pip
+
+sudo -u www-data env HOME="$BASE/tmp" XDG_CACHE_HOME="$BASE/tmp" PIP_CACHE_DIR="$BASE/tmp/pip-cache" \
+"$VENV/bin/pip" install numpy pygrib matplotlib >/dev/null &
+spinner $!
+
+# ---------- relocate ham ----------
+STEP=$((STEP+1)); progress $STEP $STEPS
 echo -e "${BLU}==> Relocating ham content into htdocs${NC}"
 
-sudo mkdir -p $BASE/htdocs
+sudo mkdir -p "$BASE/htdocs"
 
 if [ -d "$BASE/ham" ]; then
-    sudo rm -rf $BASE/htdocs/ham
-    sudo mv $BASE/ham $BASE/htdocs/
+  sudo rm -rf "$BASE/htdocs/ham"
+  sudo mv "$BASE/ham" "$BASE/htdocs/"
 fi
 
 sudo chown -R www-data:www-data "$BASE"
@@ -146,43 +134,39 @@ STEP=$((STEP+1)); progress $STEP $STEPS
 echo -e "${BLU}==> Creating directories${NC}"
 
 sudo mkdir -p \
- /opt/hamclock-backend/tmp \
- /opt/hamclock-backend/logs \
- /opt/hamclock-backend/cache \
- /opt/hamclock-backend/data \
- /opt/hamclock-backend/htdocs/ham/HamClock
+ "$BASE/tmp" \
+ "$BASE/logs" \
+ "$BASE/cache" \
+ "$BASE/data" \
+ "$BASE/htdocs/ham/HamClock"
 
-sudo chown -R www-data:www-data /opt/hamclock-backend
+sudo chown -R www-data:www-data "$BASE"
 
 # ---------- lighttpd ----------
 STEP=$((STEP+1)); progress $STEP $STEPS
 echo -e "${BLU}==> Configuring lighttpd${NC}"
 
-sudo ln -sf \
- $BASE/50-hamclock.conf \
- /etc/lighttpd/conf-enabled/50-hamclock.conf
-
+sudo ln -sf "$BASE/50-hamclock.conf" /etc/lighttpd/conf-enabled/50-hamclock.conf
+sudo lighttpd -t -f /etc/lighttpd/lighttpd.conf
+sudo systemctl daemon-reload
 sudo systemctl restart lighttpd
 
 # ---------- cron ----------
 STEP=$((STEP+1)); progress $STEP $STEPS
-
 echo -e "${BLU}==> Installing www-data crontab${NC}"
 
-sudo chmod 644 $BASE/scripts/crontab
-
-sudo -u www-data crontab $BASE/scripts/crontab
-
+sudo chmod 644 "$BASE/scripts/crontab"
+sudo -u www-data crontab "$BASE/scripts/crontab"
 sudo systemctl restart cron
 
 # ---------- initial gen ----------
 STEP=$((STEP+1)); progress $STEP $STEPS
 echo -e "${BLU}==> Initial artifact generation${NC}"
 
-sudo chmod +x $BASE/scripts/*
+sudo chmod +x "$BASE/scripts/"*
 
 sudo -u www-data bash <<EOF
-cd $BASE/scripts || exit 1
+cd "$BASE/scripts" || exit 1
 for f in gen_ssn.pl gen_kp.pl gen_aurora.pl update_all_sdo.sh; do
   [ -f "\$f" ] && ./"\$f" || echo "Skipping \$f"
 done
