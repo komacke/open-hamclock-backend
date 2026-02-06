@@ -1,5 +1,8 @@
 #!/bin/sh
 
+# pull down latest server data files
+/usr/sbin/runuser -u www-data /opt/sync_server_data_files.sh
+
 # start the web server
 /usr/sbin/lighttpd -f /etc/lighttpd/lighttpd.conf
 

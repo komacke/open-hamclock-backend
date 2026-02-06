@@ -4,6 +4,7 @@ USER root
 WORKDIR /opt
 
 # Install prerequisites
+COPY docker/sync_server_data_files.sh /opt
 COPY docker/package-list.txt /opt
 RUN apt update && \
     apt install -y $(grep -v '^#' package-list.txt) && \
