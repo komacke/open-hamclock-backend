@@ -10,7 +10,16 @@ use File::Temp qw(tempfile);
 my $URL = 'https://services.swpc.noaa.gov/json/goes/primary/xrays-3-day.json';
 
 # Output file expected by HamClock
-my $OUT = 'xray.txt';
+my $OUT = '/opt/hamclock-backend/htdocs/ham/HamClock/xray/xray.txt';
+
+# Where to write temp files
+my $TMPDIR = '/opt/hamclock-backend/tmp';
+# Ensure TMPDIR exists
+if (!-d $TMPDIR) {
+    make_path($TMPDIR, { mode => 0755 })
+      or die "ERROR: failed to create $TMPDIR: $!\n";
+}
+die "ERROR: TMPDIR not writable: $TMPDIR\n" unless -w $TMPDIR;
 
 # Fetch JSON
 my $ua = LWP::UserAgent->new(
@@ -52,7 +61,7 @@ for my $r (@$rows) {
 }
 
 # Write atomically so HamClock never sees partial output
-my ($fh, $tmp) = tempfile('xrayXXXX', UNLINK => 0);
+my ($fh, $tmp) = tempfile('xrayXXXX', DIR => $TMPDIR, UNLINK => 0);
 
 for my $time (sort keys %by_time) {
 
