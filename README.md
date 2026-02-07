@@ -41,10 +41,10 @@ This project generates map and data artifacts in the same formats expected by th
 ## Compatibility
 - [x] Ubuntu 22.x LTS
 - [x] Ubuntu 24 AWS AMI
-- [ ] Debian 13.3 
-- [ ] Raspberry Pi
+- [x] Debian 13.3 
+- [x] Raspberry Pi
 - [x] Windows Subsystem for Linux
-- [ ] Inovato Quadra
+- [x] Inovato Quadra
 - [ ] Mac 
 
 ## Install:
