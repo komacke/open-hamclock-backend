@@ -40,6 +40,8 @@ This project generates map and data artifacts in the same formats expected by th
 - Raspberry Pi needs to use 50-Hamclock-pi.conf in the repository instead of 50-Hamclock.conf for the lighttpd conf. Replace the configuration file at /etc/lighttpd/etc/conf.enabled with 50-Hamclock-pi.conf
 - Raspberry Pi may need permissions set on all scripts with chmod +x at /opt/hamclock-backend/htdocs/ham/HamClock. Execute chmod -R +x /opt/hamclock-backend/htdocs/ham/HamClock at the command line on the Raspberry Pi
 - DRAP data will show as invalid on fresh OHB installs because it takes approximately 36 hours to build up a suitable cache. The reason for this is because NOAA does not publish historical, current day data so if the application wants to show a time series graph including the current day then it needs to be pulling from NOAA SWX every five minutes. The fix for this when using OHB is to allow OHB to cache for 36 hours after a fresh install
+  - Running the server data sync script will pull down the latest aurora and DRAP stats.txt file from an active HamClock server (Currently ClearSkyInstitute):
+    - /opt/hamclock-backend/scripts/sync_server_data_files.sh
   
 
 ## Compatibility
