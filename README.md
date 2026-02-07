@@ -68,8 +68,11 @@ chmod +x ./install_ohb.sh
 sudo ./install_ohb.sh --sizes "660x330,1320x660,1980x990"
 ```
 ### Option B: Repeat --size
+```bash
 chmod +x ./install_ohb.sh
 sudo ./install_ohb.sh --size 660x330 --size 1320x660 --size 1980x990
+```
+
 Install script will store configuration under /opt/hamclock-backend/etc/ohb-sizes.conf
 
 ```bash
