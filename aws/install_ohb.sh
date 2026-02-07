@@ -222,6 +222,7 @@ run_flock_sh() {
 
 run_sh  gen_solarflux-history.sh
 run_perl gen_swind_24hr.pl
+run_perl gen_ssn.pl
 run_sh  update_pota_parks_cache.sh
 run_perl update_solarflux_cache.pl
 run_sh  update_wx_mb_maps.sh
