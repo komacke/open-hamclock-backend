@@ -43,7 +43,6 @@ RUN cd /opt/hamclock-backend && \
         cache \
         data \
         htdocs && \
-    mv ham htdocs/ && \
     mv  docker/run.sh /opt && \
     sed 's/^\([^ #]\+[ ]\+\)\{5\}\([^>]\+\)\([> ]\+\)\?\([^ ]*\).*$/\2\3\4/' scripts/crontab > prime_crontabs.sh && \
     # \

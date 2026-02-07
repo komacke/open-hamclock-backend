@@ -27,7 +27,7 @@ fi
 sed "s/__IMAGE__/$IMAGE/" docker-compose.yml.tmpl > docker-compose.yml
 sed -i "s/__IMAGE_BASE__/$IMAGE_BASE/" docker-compose.yml
 
-if $(docker image list --format '{{.Repository}}:{{.Tag}}' | grep -qs $IMAGE) ; then
+if $(docker image list --format '{{.Repository}}:{{.Tag}}' | grep -qs $IMAGE) && [ $TAG != latest ]; then
     echo "The docker image for '$IMAGE' already exists. Please remove it if you want to rebuild."
     # NOT ENFORCING THIS YET
     #exit 2
