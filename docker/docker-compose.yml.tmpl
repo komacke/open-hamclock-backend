@@ -7,6 +7,8 @@ services:
       - __IMAGE_BASE__
     ports:
       - :80:80
+    volumes:
+      - ohb-htdocs:/opt/hamclock/htdocs
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:80/ham/HamClock/version.pl"]
       timeout: "5s"
@@ -25,3 +27,7 @@ networks:
      driver: default
     driver_opts:
       com.docker.network.bridge.name: __IMAGE_BASE__
+
+volumes:
+  ohb-htdocs:
+    external: true

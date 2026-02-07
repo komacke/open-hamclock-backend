@@ -51,7 +51,7 @@ RUN cd /opt/hamclock-backend && \
     chown -R www-data:www-data . && \
     chmod +x scripts/* prime_crontabs.sh /opt/run.sh && \
     # \
-    # fontconfig needs a writeable cache director \
+    # fontconfig needs a writeable cache directory \
     mkdir -p /var/www/.fontconfig && \
     chown -R www-data:www-data /var/www/.fontconfig && \
     # \
