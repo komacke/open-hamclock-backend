@@ -4,6 +4,7 @@
 #/usr/sbin/runuser -u www-data /opt/sync_server_data_files.sh
 
 # start the web server
+echo "Starting lighttpd ..."
 /usr/sbin/lighttpd -f /etc/lighttpd/lighttpd.conf
 
 echo "Syncing the initial, static directory structure ..."
@@ -18,10 +19,15 @@ if [ ! -e /opt/hamclock-backend/htdocs/prime_crontabs.done ]; then
 
     touch /opt/hamclock-backend/htdocs/prime_crontabs.done
     echo "Done! OHB data has been primed."
+else
+    echo "OHB was previously installed and does not need to be primed."
 fi
 
 # start cron
+echo "Starting cron ..."
 /usr/sbin/cron
+
+echo "The OHB is running and ready to use."
 
 # hold the script to keep the container running
 tail --pid=$(pidof cron) -f /dev/null
