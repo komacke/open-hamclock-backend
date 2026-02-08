@@ -180,6 +180,8 @@ fi
 
 sudo chown -R www-data:www-data "$BASE"
 
+
+
 # Make Perl CGI scripts executable for lighttpd/mod_cgi
 sudo find "$BASE/htdocs/ham/HamClock" -maxdepth 1 -type f -name '*.pl' -exec chmod 755 {} \;
 
@@ -193,6 +195,43 @@ sudo mkdir -p \
  "$BASE/cache" \
  "$BASE/data" \
  "$BASE/htdocs/ham/HamClock"
+
+# ---------- maps (from GitHub release) ----------
+STEP=$((STEP+1)); progress $STEP $STEPS
+echo -e "${BLU}==> Installing map assets${NC}"
+
+MAP_TAG="maps-v1"
+MAP_BASE="https://github.com/BrianWilkinsFL/open-hamclock-backend/releases/download/$MAP_TAG"
+MAP_ARCHIVE="ohb-maps.tar.zst"
+MAP_SHA="$MAP_ARCHIVE.sha256"
+
+TMPMAP="$BASE/tmp/maps"
+sudo mkdir -p "$TMPMAP"
+sudo chown -R www-data:www-data "$TMPMAP"
+
+cd "$TMPMAP"
+
+# ensure zstd exists
+if ! command -v zstd >/dev/null; then
+  echo "Installing zstd..."
+  sudo apt-get install -y zstd >/dev/null
+fi
+
+echo "Fetching maps from GitHub..."
+
+sudo -u www-data curl -fsSLO "$MAP_BASE/$MAP_ARCHIVE"
+sudo -u www-data curl -fsSLO "$MAP_BASE/$MAP_SHA"
+
+# verify checksum
+sudo -u www-data sha256sum -c "$MAP_SHA"
+
+# extract directly into HamClock tree
+sudo tar -I zstd -xf "$MAP_ARCHIVE" -C "$BASE/htdocs/ham/HamClock"
+
+# ownership sanity
+sudo chown -R www-data:www-data "$BASE/htdocs/ham/HamClock/maps"
+
+echo -e "${GRN}Maps installed.${NC}"
 
 sudo chown -R www-data:www-data "$BASE"
 
