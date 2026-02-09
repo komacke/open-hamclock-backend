@@ -27,9 +27,9 @@ IN="$TMPDIR/drap.png"
 curl -fsSL -A "open-hamclock-backend/1.0" --retry 2 --retry-delay 2 -o "$IN" "$URL"
 
 # Source crop rectangle (in NOAA source pixels)
-SRC_CROP_W=660
+SRC_CROP_W=677
 SRC_CROP_H=330
-SRC_XOFF=9
+SRC_XOFF=12
 SRC_YOFF=0
 
 # Crop once, reuse for all sizes (avoids repeated decode)
