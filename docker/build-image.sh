@@ -105,10 +105,20 @@ make_docker_compose() {
 }
 
 warn_image_tag() {
-    if $(docker image list --format '{{.Repository}}:{{.Tag}}' | grep -qs $IMAGE) && [ $TAG != latest ]; then
-        echo "The docker image for '$IMAGE' already exists. Please remove it if you want to rebuild."
-        # NOT ENFORCING THIS YET
-        #exit 2
+    if [ $TAG != latest ]; then
+        if [ $MULTI_PLATFORM == true ]; then
+            docker manifest inspect komacke/open-hamclock-backend:latest >/dev/null
+            if [ $? -eq 0 ]; then
+                echo
+                echo "WARNING: the multiplatform docker image for '$IMAGE' already exists in Docker Hub. Please"
+                echo "         remove it if you want to rebuild."
+                exit 2
+            fi
+        elif docker image list --format '{{.Repository}}:{{.Tag}}' | grep -qs $IMAGE; then
+            echo
+            echo "WARNING: the docker image for '$IMAGE' already exists. Please remove it if you want to rebuild."
+            exit 2
+        fi
     fi
 }
 
