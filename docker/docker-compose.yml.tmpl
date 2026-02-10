@@ -6,7 +6,7 @@ services:
     networks:
       - ohb
     ports:
-      - :__HTTP_PORT__:80
+      - __HTTP_PORT__:80
     volumes:
       - ohb-htdocs:/opt/hamclock-backend/htdocs
     healthcheck:

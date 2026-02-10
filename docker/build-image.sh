@@ -4,7 +4,6 @@
 IMAGE_BASE=komacke/open-hamclock-backend
 VOACAP_VERSION=v.0.7.6
 HTTP_PORT=80
-ONLY_COMPOSE=false
 
 # Don't set anything past here
 TAG=$(git describe --exact-match --tags 2>/dev/null)
@@ -24,29 +23,44 @@ HERE="$(realpath -s "$(dirname "$0")")"
 THIS="$(basename "$0")"
 cd $HERE
 
-RETVAL=0
-
 usage() {
     cat<<EOF
 $THIS: 
     -c: build compose only
     -p <port>: set the http port
+    -m: multi-platform image buld for: linux/amd64 linux/arm64 linux/arm/v7
+        - argument is ignored when run with -c
+        - remember to setup a buildx container: 
+            docker buildx create --name ohb --driver docker-container --use
+            docker buildx inspect --bootstrap
 EOF
+    exit 0
 }
 
 main() {
+    RETVAL=0
+    ONLY_COMPOSE=false
+    MULTI_PLATFORM=false
 
-    while getopts ":p:ch" opt; do
+    if [[ "$@" =~ --help ]]; then
+        usage
+    fi
+
+    while getopts ":p:cmh" opt; do
         case $opt in
             c)
                 ONLY_COMPOSE=true
                 ;;
             p)
                 HTTP_PORT="$OPTARG"
+                # if there was a :, it was probably IP:PORT; otherwise add colon for port only
+                [[ $HTTP_PORT =~ : ]] || HTTP_PORT=":$HTTP_PORT"
+                ;;
+            m)
+                MULTI_PLATFORM=true
                 ;;
             h)
                 usage
-                exit 0
                 ;;
             \?) # Handle invalid options
                 echo "Invalid option: -$OPTARG" >&2
@@ -103,7 +117,11 @@ build_image() {
     echo
     echo "Building image for '$IMAGE_BASE:$TAG'"
     pushd "$HERE/.." >/dev/null
-    docker build --rm -t $IMAGE -f docker/Dockerfile .
+    if [ $MULTI_PLATFORM == true ]; then
+        docker buildx build -t $IMAGE -f docker/Dockerfile --platform linux/amd64,linux/arm64 --push .
+    else
+        docker build -t $IMAGE -f docker/Dockerfile .
+    fi
     RETVAL=$?
     popd >/dev/null
 }
