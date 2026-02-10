@@ -62,6 +62,8 @@ Status: In Progress. We are investigating and testing the use of ITURHFPROP over
 - [ ] Mac 
 
 ## Install:
+(NOTE: to run OHB in docker, visit https://github.com/BrianWilkinsFL/open-hamclock-backend/blob/main/docker/README.md)
+
 ```bash
    # Confirmed working in aws t3-micro Ubuntu 24.x LTS instance
    wget https://raw.githubusercontent.com/BrianWilkinsFL/open-hamclock-backend/refs/heads/main/aws/install_ohb.sh

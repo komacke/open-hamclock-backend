@@ -99,6 +99,16 @@ Upgrading OHB is easy. Basically run all the steps above again. You don't need t
 
 The data is persisted in the storage space you created in the first install. It will have the history after you upgrade. If there are new features, possibly those could take a while to populate. It just depends on the feature.
 
+## Are you running the official bleeding edge?
+If you are running the official "latest" image from Docker Hub, i.e., not building it youself, you need to pull the image.
+
+Docker compose only checks if an image exists locally. It doesn't check to see if an existing image has a newer version at Docker Hub. You have to do so manually.
+```
+docker pull komacke/open-hamclock-backend:latest
+```
+
+If you see it pull updates, then proceed with running the docker compose up command. If there are no updates, don't bother.
+
 # Your hamclock
 Ok, so you have a back end. But does your hamclock know about it? Go to the project readme and look for information about the '-b' otion to hamclock.
 
