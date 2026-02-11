@@ -1,0 +1,5 @@
+# empty lines and lines beginning with a # are ignored. Note that comments within lines are not ignored
+
+# packages required by build stage
+build-essential
+gfortran

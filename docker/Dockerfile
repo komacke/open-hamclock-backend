@@ -1,18 +1,22 @@
-FROM debian:13.3-slim
+# Multi-stage build
+
+#######################################################
+# Build voacap
+FROM debian:13.3-slim AS build-voacap
 
 USER root
 WORKDIR /opt
 
-# Install prerequisites
-COPY docker/package-list.txt /opt
-RUN apt update && \
-    apt install -y $(grep -v '^#' package-list.txt) && \
-    apt-get clean && \
-    rm -rf package-list.txt /var/lib/apt/lists/* 
-
-# Install voacap
+# Install voap build prerequisites
+COPY docker/package-list-voacap.txt /opt
 COPY docker/voacap-v.0.7.6.tgz /opt
-RUN cd /opt && \
+# Build the voacap artifacts
+RUN apt update && \
+    apt install -y --no-install-recommends $(grep -v '^#' package-list-voacap.txt) && \
+    apt-get clean && \
+    rm -rf package-list.txt /var/lib/apt/lists/* && \
+    # \
+    # Build and install voacap \
     # \
     # tarball \
     tar xzf voacap-v.0.7.6.tgz && \
@@ -22,14 +26,36 @@ RUN cd /opt && \
     ./configure && \
     make install && \
     # \
-    # configure it \
-    mkdir /var/www/itshfbc && \
-    chown www-data:www-data /var/www/itshfbc && \
-    runuser -u www-data makeitshfbc && \
-    # \
     # clean up \
     cd .. && \
     rm -Rf voacapl-v.0.7.6 voacap-v.0.7.6.tgz
+
+#######################################################
+# This is the real image
+FROM debian:13.3-slim
+
+USER root
+WORKDIR /opt
+
+# Install prerequisites
+COPY docker/package-list.txt /opt
+RUN apt update && \
+    apt install -y --no-install-recommends $(grep -v '^#' package-list.txt) && \
+    apt-get clean && \
+    rm -rf package-list.txt /var/lib/apt/lists/* 
+
+# Install voacap after lighttpd was installed above
+COPY --from=build-voacap /usr/local/bin/* /usr/local/bin/
+COPY --from=build-voacap /usr/local/share/voacapl /usr/local/share/voacapl
+COPY --from=build-voacap /usr/local/share/doc/voacapl/README.md /usr/local/share/doc/voacapl/README.md
+COPY --from=build-voacap /usr/local/share/doc/voacapl/AUTHORS /usr/local/share/doc/voacapl/AUTHORS
+COPY --from=build-voacap /usr/local/share/doc/voacapl/COPYING /usr/local/share/doc/voacapl/COPYING
+RUN cd /opt && \
+    # \
+    # configure it \
+    mkdir /var/www/itshfbc && \
+    chown www-data:www-data /var/www/itshfbc && \
+    runuser -u www-data makeitshfbc
 
 # Install hamclock-backend
 COPY . /opt/hamclock-backend/
