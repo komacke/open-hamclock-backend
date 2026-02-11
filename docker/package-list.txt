@@ -10,11 +10,8 @@ curl
 ffmpeg
 imagemagick
 jq
-libeccodes-dev
-libg2c-dev
 libhtml-parser-perl
 libjson-perl
-libpng-dev
 librsvg2-bin
 libtext-csv-xs-perl
 libwww-perl
