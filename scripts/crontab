@@ -46,7 +46,10 @@
 17 */12 * * * /opt/hamclock-backend/scripts/gen_kindex.pl >> /opt/hamclock-backend/logs/gen_kindex.log 2>&1
 0 */6 * * * /opt/hamclock-backend/scripts/fetch_tle.sh >> /opt/hamclock-backend/logs/fetch_tle.log 2>&1
 6 */1 * * * /opt/hamclock-backend/scripts/gen_dst.sh >> /opt/hamclock-backend/logs/gen_dst.log 2>&1
-*/30 * * * * /opt/hamclock-backend/scripts/gen_aurora.sh >> /opt/hamclock-backend/logs/gen_aurora.log 2>&1
+# Give NOAA time to breathe
+2,32 * * * * /opt/hamclock-backend/scripts/gen_aurora.sh >> /opt/hamclock-backend/logs/gen_aurora.log 2>&1
+# Optional watchdog
+0 4 * * 0 /opt/hamclock-backend/scripts/validate_aurora.sh >> /opt/hamclock-backend/logs/aurora_validate.log 2>&1
 */30 * * * * /opt/hamclock-backend/scripts/gen_noaaswx.sh >> /opt/hamclock-backend/logs/gen_noaswxx.log 2>&1
 */15 * * * * /opt/hamclock-backend/scripts/update_all_sdo.sh >> /opt/hamclock-backend/logs/update_all_sdo.log 2>&1
 */5 * * * * /opt/hamclock-backend/scripts/gen_onta.pl >> /opt/hamclock-backend/logs/gen_onta.log 2>&1

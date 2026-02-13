@@ -1,40 +1,63 @@
 #!/bin/bash
 
-# By SleepyNinja
-THIS=$(basename $0)
+THIS=$(basename "$0")
 
-# Define JSON URL and Output Path
 URL="https://services.swpc.noaa.gov/json/ovation_aurora_latest.json"
 OUT="/opt/hamclock-backend/htdocs/ham/HamClock/aurora/aurora.txt"
+CACHE="/opt/hamclock-backend/cache"
+LOG="/opt/hamclock-backend/logs/gen_aurora.log"
 
-# 1. Fetch the JSON data and find the MAX coordinate
-MAX_VALUE=$(curl -s "$URL" | jq '.coordinates | map(.[2]) | max')
+EXPECTED=48
+CADENCE=1800
+MAX_GAP=3600
 
-# 2. Get the current UNIX epoch time
-EPOCH_TIME=$(date +%s)
+mkdir -p "$CACHE"
+mkdir -p "$(dirname "$LOG")"
 
-# if this is a fresh install, we won't have the history. It seems like
-# hamclock doesn't like old timestamps so we can't keep a seed file in git.
-# Instead what we'll do is take the last value and save it 48 times to meet
-# the hamclock requirement of 48 data points. It will be just a straight line
-# but eventually it will fill in.
-if [ -e "$OUT" ]; then
-    # 3. Append the new data to the file
-    echo "$EPOCH_TIME $MAX_VALUE" >> "$OUT"
+MAX_VALUE=$(curl -fs "$URL" | jq '.coordinates | map(.[2]) | max')
 
-    # 4. Trim the file to keep only the last 48 lines
-    # This keeps the file size constant by slicing off the oldest entry
-    TRIMMED_DATA=$(tail -n 48 "$OUT")
-    echo "$TRIMMED_DATA" > "$OUT"
-
-else
-    TMPFILE=$(mktemp /opt/hamclock-backend/cache/$THIS-XXXXX)
-    # if the file doesn't exist, go backwards for 48 samples every
-    # 30 minutes
-    for i in {0..47}; do
-        echo "$(($EPOCH_TIME - 30 * 60 * $i)) $MAX_VALUE" >> "$TMPFILE"
-    done
-    # needs to be increasing
-    sort -V -o $OUT $TMPFILE
-    rm -f $TMPFILE
+if [ -z "$MAX_VALUE" ]; then
+    echo "$(date -Is) ERROR: aurora fetch failed" >> "$LOG"
+    exit 1
 fi
+
+# Quantize epoch to exact 30-minute bins
+NOW=$(date +%s)
+EPOCH_TIME=$(( NOW / CADENCE * CADENCE ))
+
+reseed() {
+    echo "$(date -Is) INFO: reseeding aurora history" >> "$LOG"
+    TMP=$(mktemp "$CACHE/$THIS-XXXXX")
+
+    for i in $(seq $((EXPECTED-1)) -1 0); do
+        echo "$(( EPOCH_TIME - CADENCE * i )) $MAX_VALUE" >> "$TMP"
+    done
+
+    mv "$TMP" "$OUT"
+}
+
+if [ ! -f "$OUT" ]; then
+    reseed
+    exit 0
+fi
+
+LAST_EPOCH=$(tail -n 1 "$OUT" | awk '{print $1}')
+
+if ! [[ "$LAST_EPOCH" =~ ^[0-9]+$ ]]; then
+    reseed
+    exit 0
+fi
+
+DELTA=$(( EPOCH_TIME - LAST_EPOCH ))
+
+# If gap too large or time went backwards — reseed
+if [ "$DELTA" -le 0 ] || [ "$DELTA" -gt "$MAX_GAP" ]; then
+    reseed
+    exit 0
+fi
+
+# Normal append
+echo "$EPOCH_TIME $MAX_VALUE" >> "$OUT"
+
+# Enforce exact window
+tail -n "$EXPECTED" "$OUT" > "$OUT.tmp" && mv "$OUT.tmp" "$OUT"
