@@ -9,7 +9,7 @@ LOG="/opt/hamclock-backend/logs/gen_aurora.log"
 
 EXPECTED=48
 CADENCE=1800
-MAX_GAP=3600
+RESEED_GAP=$((12*3600))   # only reseed if >12h gap
 
 mkdir -p "$CACHE"
 mkdir -p "$(dirname "$LOG")"
@@ -21,7 +21,6 @@ if [ -z "$MAX_VALUE" ]; then
     exit 1
 fi
 
-# Quantize epoch to exact 30-minute bins
 NOW=$(date +%s)
 EPOCH_TIME=$(( NOW / CADENCE * CADENCE ))
 
@@ -36,6 +35,7 @@ reseed() {
     mv "$TMP" "$OUT"
 }
 
+# First install
 if [ ! -f "$OUT" ]; then
     reseed
     exit 0
@@ -43,15 +43,16 @@ fi
 
 LAST_EPOCH=$(tail -n 1 "$OUT" | awk '{print $1}')
 
-if ! [[ "$LAST_EPOCH" =~ ^[0-9]+$ ]]; then
-    reseed
+# Same bucket → do nothing
+if [ "$LAST_EPOCH" = "$EPOCH_TIME" ]; then
+    echo "LAST_EPOC = EPOCH_TIME. Nothing to do."
     exit 0
 fi
 
 DELTA=$(( EPOCH_TIME - LAST_EPOCH ))
 
-# If gap too large or time went backwards — reseed
-if [ "$DELTA" -le 0 ] || [ "$DELTA" -gt "$MAX_GAP" ]; then
+# Time went backwards or giant outage → reseed
+if [ "$DELTA" -le 0 ] || [ "$DELTA" -gt "$RESEED_GAP" ]; then
     reseed
     exit 0
 fi
@@ -59,5 +60,5 @@ fi
 # Normal append
 echo "$EPOCH_TIME $MAX_VALUE" >> "$OUT"
 
-# Enforce exact window
+# Enforce rolling window
 tail -n "$EXPECTED" "$OUT" > "$OUT.tmp" && mv "$OUT.tmp" "$OUT"
