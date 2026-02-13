@@ -8,7 +8,9 @@ use Time::Piece;
 my $URL = 'https://spaceweather.gc.ca/solar_flux_data/daily_flux_values/fluxtable.txt';
 my $URL_PREDICT = 'https://services.swpc.noaa.gov/text/45-day-ap-forecast.txt';
 my $CACHE = '/opt/hamclock-backend/data/solarflux-cache.txt';
-my $MAX_VALUES = 99;
+my $MAX_HISTORY_VALUES = 90;
+my $MAX_PREDICT_VALUES = 9;
+my $MAX_VALUES = $MAX_HISTORY_VALUES + $MAX_PREDICT_VALUES;
 
 my $ua = LWP::UserAgent->new(timeout => 10);
 
@@ -30,6 +32,9 @@ if (open my $fh, '<', $CACHE) {
     }
     close $fh;
 }
+
+# remove the predict values
+splice(@cache, -$MAX_PREDICT_VALUES);
 
 # Parse spaceweather canada file
 for my $line (split /\n/, $resp->decoded_content) {
