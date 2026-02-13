@@ -50,89 +50,72 @@ Status: In Progress. We made progress by developing a script to create the base 
 # Importance of Accurate and Consistent Time
 This is worth documenting explicitly. Your backend now depends on monotonic, synchronized time. Without it, feeds appear “broken” even when structurally correct.
 
-Below is a clean, technical README section you can drop into OHB.
-
-Time Synchronization Requirements
+## Time Synchronization Requirements
 
 Open HamClock Backend (OHB) and all HamClock clients must maintain accurate and synchronized system time.
 
 OHB generates time-series data (aurora, solar wind, DRAP, SSN, etc.) using Unix epoch timestamps. HamClock clients compute data age using:
 
-age = now_client - epoch_from_backend
-
+```age = now_client - epoch_from_backend```
 
 If the client clock is incorrect or significantly out of sync with the backend, HamClock will discard valid data and log errors such as:
 
 AURORA: skipping age -491926 hrs
 AURORA: only 0 points
 
-
 Negative ages indicate the client believes the data is from the future.
 
-Required Conditions
+## Required Conditions
 
-• Backend system clock must be accurate (UTC).
-• HamClock client clock must be accurate (UTC).
-• Clock skew between backend and clients should be less than a few seconds.
+* Backend system clock must be accurate (UTC)
+* HamClock client clock must be accurate (UTC)
+* Clock skew between backend and clients should be less than a few seconds
 
-Even multi-minute skew can distort plotted slopes.
-Large skew (hours/days/years) will cause complete data rejection.
+Even multi-minute skew can distort plotted slopes
+Large skew (hours/days/years) will cause complete data rejection
 
-Enabling Time Sync (Linux / Raspberry Pi)
+## Enabling Time Sync (Linux / Raspberry Pi)
 
 Verify status:
 
-timedatectl
-
+```timedatectl```
 
 Enable NTP synchronization:
 
-sudo timedatectl set-ntp true
-sudo systemctl restart systemd-timesyncd
-
+```sudo timedatectl set-ntp true```
+```sudo systemctl restart systemd-timesyncd```
 
 If systemd-timesyncd is not available:
 
-sudo apt install ntp
-sudo systemctl enable ntp
-sudo systemctl start ntp
-
+```sudo apt install ntp```
+```sudo systemctl enable ntp```
+```sudo systemctl start ntp```
 
 Confirm synchronization:
 
-timedatectl
-
+```timedatectl```
 
 You should see:
 
-System clock synchronized: yes
+```System clock synchronized: yes```
 
-Why This Matters
+## Why This Matters
 
-OHB uses deterministic epoch flooring (30-minute cadence).
-HamClock assumes evenly spaced historical bins.
+* OHB uses deterministic epoch flooring (30-minute cadence)
+* HamClock assumes evenly spaced historical bins
 
 Time drift breaks these assumptions.
 
 Symptoms of clock problems include:
 
-• Aurora graph shows no data
-• “skipping age” messages
-• Flatlined plots
-• Sudden apparent time gaps
+* Aurora graph shows no data
+* “skipping age” messagesFlatlined plots
+* Sudden apparent time gaps
 
-These are almost always clock skew issues — not backend failures.
+These are almost always clock skew issues — not backend failures
 
-Operational Recommendation
+OHB does not compensate for client clock drift by design
 
-In production environments:
-
-• Enable NTP on all systems
-• Monitor time sync status
-• Avoid manual time changes
-• Avoid running systems without network time for extended periods
-
-OHB does not compensate for client clock drift by design.
 ## Compatibility
 - [x] Ubuntu 22.x LTS (Baremetal, VM, or WSL)
 - [x] Ubuntu 24 AWS AMI (Baremetal, VM, or WSL)
