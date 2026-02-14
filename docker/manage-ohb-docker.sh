@@ -147,9 +147,8 @@ install_ohb() {
     return $RETVAL
 }
 
-install_ohb() {
+upgrade_ohb() {
     check_docker_installed >/dev/null || return $?
-    check_dvc_created || return $?
 
     echo "Upgrading OHB ..."
 
@@ -268,16 +267,22 @@ rm_dvc() {
 }
 
 get_current_http_port() {
-    DOCKER_HTTP_PORT=$(docker inspect $CONTAINER | jq -r '.[0].HostConfig.PortBindings."80/tcp"[0].HostPort')
-    DOCKER_HTTP_IP=$(docker inspect $CONTAINER | jq -r '.[0].HostConfig.PortBindings."80/tcp"[0].HostIp')
-    if [ -n "$DOCKER_HTTP_PORT" ]; then
-        CURRENT_HTTP_PORT=$DOCKER_HTTP_IP:$DOCKER_HTTP_PORT
+    DOCKER_HTTP_PORT=$(docker inspect $CONTAINER 2>/dev/null | jq -r '.[0].HostConfig.PortBindings."80/tcp"[0].HostPort')
+    DOCKER_HTTP_IP=$(docker inspect $CONTAINER 2>/dev/null | jq -r '.[0].HostConfig.PortBindings."80/tcp"[0].HostIp')
+    if [ "$DOCKER_HTTP_PORT" != 'null' ]; then
+        if [ "$DOCKER_HTTP_IP" != 'null' ]; then
+            CURRENT_HTTP_PORT=$DOCKER_HTTP_IP:$DOCKER_HTTP_PORT
+        else
+            CURRENT_HTTP_PORT=:$DOCKER_HTTP_PORT
+        fi
     fi
 }
 
 get_current_image_tag() {
-    DOCKER_IMAGE=$(docker inspect open-hamclock-backend | jq -r '.[0].Config.Image')
-    CURRENT_TAG=${DOCKER_IMAGE#*:}
+    DOCKER_IMAGE=$(docker inspect open-hamclock-backend 2>/dev/null | jq -r '.[0].Config.Image')
+    if [ "$DOCKER_IMAGE" != 'null' ]; then
+        CURRENT_TAG=${DOCKER_IMAGE#*:}
+    fi
 }
 
 docker_compose_yml() {
@@ -287,7 +292,7 @@ docker_compose_yml() {
     if [ -n "$REQUESTED_HTTP_PORT" ]; then
         # first precedence
         HTTP_PORT=$REQUESTED_HTTP_PORT
-    elif [ -n "$CURRENT_HTTP_PORT" ]; then
+    elif [ -n "$CURRENT_HTTP_PORT" -a "$CURRENT_HTTP_PORT" != ':' ]; then
         # second precedence
         HTTP_PORT=$CURRENT_HTTP_PORT
     else
