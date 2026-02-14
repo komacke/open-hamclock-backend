@@ -11,6 +11,7 @@ cd $HERE
 DOCKER_PROJECT=${THIS%.*}
 DEFAULT_TAG=latest
 GIT_TAG=$(git describe --exact-match --tags 2>/dev/null)
+GIT_VERSION=$(git rev-parse --short HEAD 2>/dev/null)
 CONTAINER=${IMAGE_BASE##*/}
 DEFAULT_HTTP_PORT=:80
 RETVAL=0
@@ -45,6 +46,8 @@ main() {
             ;;
         restart)
             shift && get_compose_opts "$@"
+            get_current_http_port
+            get_current_image_tag
             docker_compose_down
             docker_compose_up
             ;;
@@ -98,7 +101,7 @@ $THIS <COMMAND> [options]:
     check-docker:
             checks docker requirements and shows version
 
-    check_ohb_install:
+    check-ohb-install:
             checkif OHB is installed and report versions
 
     install [-p <port>] [-t <tag>]
@@ -189,12 +192,12 @@ check_ohb_installed() {
         echo "  Docker image tag:  '$CURRENT_TAG'"
         echo "  HTTP PORT in use:  '$CURRENT_HTTP_PORT'"
     fi
-    if ! docker ps --format '{{.Names}}' | grep -wqs $CONTAINER; then
+
+    if !  is_container_running; then
         echo
         echo "OHB appears to be in a failed state. Try '$THIS up' and look for docker errors."
     fi
 
-    GIT_VERSION=$(git rev-parse --short HEAD 2>/dev/null)
     if [ -n "$GIT_VERSION" ]; then
         echo
         echo "You appear to have OHB source code checked out from git."
@@ -267,7 +270,7 @@ docker_compose_down() {
     docker compose -f <(docker_compose_yml) down -v
     RETVAL=$?
 
-    docker ps --format '{{.Names}}' | grep -wqs $CONTAINER
+    is_container_running
     if [ $? -eq 0 ]; then
         RUNNING_PROJECT=$(docker inspect open-hamclock-backend | jq -r '.[0].Config.Labels."com.docker.compose.project"')
         if [ "$RUNNING_PROJECT" != "$DOCKER_PROJECT" ]; then
@@ -278,6 +281,8 @@ docker_compose_down() {
             echo "ERROR: OHB failed to stop."
         fi
         RETVAL=1
+    else
+        echo "OHB was not running."
     fi
     
     return $RETVAL
@@ -305,12 +310,25 @@ remove_ohb() {
 }
 
 recreate_ohb() {
+    get_current_http_port
+    get_current_image_tag
+
     remove_ohb || return $RETVAL
     install_ohb || return $RETVAL
 }
 
 is_dvc_exists() {
     docker volume ls | grep -qsw $OHB_HTDOCS_DVC
+    return $?
+}
+
+is_container_running() {
+    docker ps --format '{{.Names}}' | grep -wqs $CONTAINER
+    return $?
+}
+
+is_container_exists() {
+    docker ps -a --format '{{.Names}}' | grep -wqs $CONTAINER
     return $?
 }
 
