@@ -91,13 +91,15 @@ $THIS <COMMAND> [options]:
     check-docker:
             checks docker requirements and shows version
 
-    install [-p <port>]:
+    install [-p <port>] [-t <tag>]
             do a fresh install and optionally provide the version
             -p: set the HTTP port
+            -t: set image tag
 
-    full-reset [-p <port>]: 
+    full-reset [-p <port>] [-t <tag>]: 
             clear out all data and start fresh
             -p: set the HTTP port (defaults to current setting)
+            -t: set image tag
 
     remove: 
             stop and remove the docker container, docker storage and docker image
@@ -105,9 +107,10 @@ $THIS <COMMAND> [options]:
     restart:
             restart OHB
 
-    generate-docker-compose:
+    generate-docker-compose [-p <port>] [-t <tag>]: 
             writes the docker compose file to STDOUT
             -p: set the HTTP port (defaults to current setting)
+            -t: set image tag
 EOF
 }
 
@@ -247,7 +250,15 @@ get_current_http_port() {
     fi
 }
 
+get_current_image_tag() {
+    DOCKER_IMAGE=$(docker inspect open-hamclock-backend | jq -r '.[0].Config.Image')
+    CURRENT_TAG=${DOCKER_IMAGE#*:}
+}
+
 docker_compose_yml() {
+    get_current_http_port
+    get_current_image_tag
+
     if [ -n "$REQUESTED_HTTP_PORT" ]; then
         # first precedence
         HTTP_PORT=$REQUESTED_HTTP_PORT
@@ -262,10 +273,16 @@ docker_compose_yml() {
     [[ $HTTP_PORT =~ : ]] || HTTP_PORT=":$HTTP_PORT"
 
     if [ -n "$REQUESTED_TAG" ]; then
+        # first precedence
         TAG=$REQUESTED_TAG
     elif [ -n "$GIT_TAG" ]; then 
+        # second precedence
         TAG=$GIT_TAG
+    elif [ -n "$CURRENT_TAG" ]; then
+        # third precedence
+        TAG=$CURRENT_TAG
     else
+        # forth precedence
         TAG=$DEFAULT_TAG
     fi
 
