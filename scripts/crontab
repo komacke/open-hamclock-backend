@@ -62,7 +62,9 @@
 */10 * * * * /opt/hamclock-backend/scripts/update_cloud_maps.sh >> /opt/hamclock-backend/logs/update_cloud_maps.log 2>&1
 */15 * * * * /opt/hamclock-backend/scripts/update_drap_maps.sh >> /opt/hamclock-backend/logs/update_drap_maps.log 2>&1
 */15 * * * * /opt/hamclock-backend/scripts/update_aurora_maps.sh >> /opt/hamclock-backend/logs/update_aurora_maps.logs 2>&1
-15 * * * * /opt/hamclock-backend/scripts/update_wx_mb_maps.sh >> /opt/hamclock-backend/logs/update_wx_mb_maps.log 2>&1
+
+# every 6 hours on the 15th minute - the data feed is only updated every 6 hours (00, 06, 12, and 18) daily
+15 6 * * * /opt/hamclock-backend/scripts/update_wx_mb_maps.sh >> /opt/hamclock-backend/logs/update_wx_mb_maps.log 2>&1
 
 # This script will be removed when clearskyinstitute ceases to operate.
 55 * * * * /opt/hamclock-backend/scripts/get-missing-from-csi.sh >> /opt/hamclock-backend/logs/get-missing-from-csi.log 2>&1

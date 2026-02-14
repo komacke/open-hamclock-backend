@@ -8,7 +8,7 @@
 #   map-D-<WxH>-Wx-mB.bmp(.z)
 #   map-N-<WxH>-Wx-mB.bmp(.z)   (only if map-N-<WxH>-Countries.bmp.z exists)
 #
-# Requires: curl, python3, ImageMagick not required, pygrib installed for python3.
+# Requires: curl, python3, matplotlib, and pygrib installed for python3.
 
 set -euo pipefail
 export LC_ALL=C
@@ -21,7 +21,6 @@ export MPLCONFIGDIR="$TMPROOT/mpl"
 # shellcheck source=/dev/null
 source "/opt/hamclock-backend/scripts/lib_sizes.sh"
 ohb_load_sizes
-
 
 # NOMADS GFS 0.25° subset endpoint (GRIB2 filter)
 NOMADS_FILTER="https://nomads.ncep.noaa.gov/cgi-bin/filter_gfs_0p25.pl"
@@ -61,14 +60,13 @@ pick_and_download() {
   return $RETVAL
 }
 
-# NOAA typically makes the weather maps available 2-4 hours after nominal runtime
-# which is every 6 hours.
-MAP_INTERVAL=6
-MAP_READY=2
-NOW=$(date -d "$MAP_READY hours ago" +%s)
+# GFS nominal cycles are every 6 hours (00/06/12/18 UTC), but the GRIB2 files on NOMADS
+# often appear a few hours later. To avoid chasing a not-yet-published cycle, we back off
+# MAP_READY hours, then round down to the nearest 6-hour boundary in UTC (to match NOMADS
+# gfs.YYYYMMDD/HH/atmos directory naming).
 
-# round down to the neeart 6-hour interval
-HOUR_NOW=$(date -d @$NOW +%H)
+NOW=$(date -u -d "$MAP_READY hours ago" +%s)
+HOUR_NOW=$(date -u -d @$NOW +%H)
 START_TIME=$(($NOW - (($HOUR_NOW % $MAP_INTERVAL)*3600) ))
 
 # try back to 8 intervals
