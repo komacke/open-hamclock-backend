@@ -70,7 +70,7 @@ spinner $!
 sudo apt-get install -y \
 git jq curl perl lighttpd imagemagick \
 libwww-perl libjson-perl libxml-rss-perl libxml-feed-perl libhtml-parser-perl \
-libeccodes-dev libpng-dev libtext-csv-xs-perl librsvg2-bin ffmpeg gmt gmt-gshhg gmt-dcw \
+libeccodes-dev libpng-dev libtext-csv-xs-perl librsvg2-bin ffmpeg ghostscript gmt gmt-gshhg gmt-dcw \
 python3 python3-venv python3-dev python3-requests python3-matplotlib build-essential gfortran gcc make libc6-dev \
 libx11-dev libxaw7-dev libxmu-dev libxt-dev libmotif-dev wget logrotate >/dev/null &
 spinner $!
@@ -191,6 +191,11 @@ sudo mkdir -p \
  "$BASE/cache" \
  "$BASE/data" \
  "$BASE/htdocs/ham/HamClock"
+
+#Fix www-data gmt execution error
+sudo mkdir /var/www/.gmt
+sudo chown www-data:www-data /var/www/.gmt
+sudo chmod 755 /var/www/.gmt
 
 # ---------- maps (from GitHub release) ----------
 STEP=$((STEP+1)); progress $STEP $STEPS

@@ -30,11 +30,11 @@ if (open my $fh, '<', $CACHE) {
         push @cache, [$d, $v];
         $seen{$d} = 1;
     }
+    # remove the predict values
+    splice(@cache, -$MAX_PREDICT_VALUES);
     close $fh;
 }
 
-# remove the predict values
-splice(@cache, -$MAX_PREDICT_VALUES);
 
 # Parse spaceweather canada file
 for my $line (split /\n/, $resp->decoded_content) {
