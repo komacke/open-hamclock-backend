@@ -383,7 +383,7 @@ run_sh  gen_noaaswx.sh
 run_sh  update_all_sdo.sh
 run_sh  update_aurora_maps.sh
 run_perl gen_onta.pl
-run_py  bz_simple.py
+run_python  bz_simple.py
 run_sh  gen_drap.sh
 run_perl genxray.pl
 run_sh  update_muf_rt_maps.sh
