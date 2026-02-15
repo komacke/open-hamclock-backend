@@ -362,6 +362,7 @@ run_sh  gen_drap.sh
 run_perl genxray.pl
 run_sh  update_muf_rt_maps.sh
 
+sudo chown -R www-data:www-data "$BASE"
 # ---------- footer ----------
 VERSION=$(git -C "$BASE" describe --tags --dirty --always 2>/dev/null || echo "unknown")
 HOST=$(hostname)
