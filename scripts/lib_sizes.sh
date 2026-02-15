@@ -2,16 +2,9 @@
 # lib_sizes.sh - shared size selection for OHB map generators
 
 # Canonical default list (keep in sync with HamClock)
-DEFAULT_SIZES=( \
-  "660x330" \
-  "1320x660" \
-  "1980x990" \
-  "2640x1320" \
-  "3960x1980" \
-  "5280x2640" \
-  "5940x2970" \
-  "7920x3960" \
-)
+# The sizes are listed in map_sizes.txt. Empty Lines and
+# comments are ignored.
+mapfile -t DEFAULT_SIZES < <(sed -e '/^[[:blank:]]*#/d' -e '/^[[:blank:]]*$/d' map_sizes.txt)
 
 # Validate a single token looks like WxH.
 ohb_is_size() {

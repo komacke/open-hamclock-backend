@@ -1,6 +1,8 @@
 #!/bin/bash
 set -e
 
+export GMT_USERDIR=/opt/hamclock-backend/tmp
+
 source "/opt/hamclock-backend/scripts/lib_sizes.sh"
 ohb_load_sizes   # populates SIZES=(...) per OHB conventions
 
