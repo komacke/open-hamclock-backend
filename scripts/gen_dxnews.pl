@@ -92,7 +92,7 @@ for my $url (sort keys %urls) {
     # -------- LOCATION --------
     my $loc = 'Unknown';
 
-    if ($p =~ m{<h1[^>]+([^<]+)</h1>}i) {
+    if ($p =~ m{<h1[^>]+>([^<]+)</h1>}i) {
         my $t = $1;
 
         # Drop DXpedition / DXNews suffixes
