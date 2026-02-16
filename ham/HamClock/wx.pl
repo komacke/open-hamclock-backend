@@ -5,6 +5,13 @@ use warnings;
 use HTTP::Tiny;
 use JSON::PP;
 
+my %weather_apis = (
+    'weather_gov'   => \&weather_gov,
+    'open_meteo'    => \&open_meteo,
+    'open_weather'  => \&open_weather,
+);
+my $use_wx_api = 'weather_gov';
+
 my $UA = HTTP::Tiny->new(
     timeout => 5,
     agent   => "HamClock-NOAA/1.1"
@@ -54,6 +61,36 @@ if (defined $lat && defined $lng) {
     $wx{timezone} = approx_timezone_seconds($lng);
 
     # 1) points lookup
+    $weather_apis{$use_wx_api}->($lat, $lng, %wx);
+}
+
+# -------------------------
+# Output (HamClock format)
+# -------------------------
+print "HTTP/1.0 200 Ok\r\n";
+print "Content-Type: text/plain; charset=ISO-8859-1\r\n";
+print "Connection: close\r\n\r\n";
+
+print "city=$wx{city}\n";
+print "temperature_c=$wx{temperature_c}\n";
+print "pressure_hPa=$wx{pressure_hPa}\n";
+print "pressure_chg=$wx{pressure_chg}\n";
+print "humidity_percent=$wx{humidity_percent}\n";
+print "dewpoint=$wx{dewpoint}\n";
+print "wind_speed_mps=$wx{wind_speed_mps}\n";
+print "wind_dir_name=$wx{wind_dir_name}\n";
+print "clouds=$wx{clouds}\n";
+print "conditions=$wx{conditions}\n";
+print "attribution=$wx{attribution}\n";
+print "timezone=$wx{timezone}\n";
+
+exit;
+
+# -------------------------
+# Alternative weather APIs
+# -------------------------
+sub weather_gov {
+    my ($lat, $lng, $wx) = @_;
     my $p = $UA->get("https://api.weather.gov/points/$lat,$lng");
     if ($p->{success}) {
         my $pd = eval { decode_json($p->{content}) };
@@ -102,28 +139,6 @@ if (defined $lat && defined $lng) {
         }
     }
 }
-
-# -------------------------
-# Output (HamClock format)
-# -------------------------
-print "HTTP/1.0 200 Ok\r\n";
-print "Content-Type: text/plain; charset=ISO-8859-1\r\n";
-print "Connection: close\r\n\r\n";
-
-print "city=$wx{city}\n";
-print "temperature_c=$wx{temperature_c}\n";
-print "pressure_hPa=$wx{pressure_hPa}\n";
-print "pressure_chg=$wx{pressure_chg}\n";
-print "humidity_percent=$wx{humidity_percent}\n";
-print "dewpoint=$wx{dewpoint}\n";
-print "wind_speed_mps=$wx{wind_speed_mps}\n";
-print "wind_dir_name=$wx{wind_dir_name}\n";
-print "clouds=$wx{clouds}\n";
-print "conditions=$wx{conditions}\n";
-print "attribution=$wx{attribution}\n";
-print "timezone=$wx{timezone}\n";
-
-exit;
 
 # -------------------------
 # Helpers
