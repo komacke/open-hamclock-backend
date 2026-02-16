@@ -365,7 +365,7 @@ run_flock_sh() {
 
 run_sh  gen_solarflux-history.sh
 run_perl gen_swind_24hr.pl
-run_perl gen_ssn.pl
+run_python ssn_simple.py
 run_perl gen_ssn_history.pl
 run_sh  update_pota_parks_cache.sh
 run_perl update_solarflux_cache.pl
@@ -387,7 +387,7 @@ run_sh  update_aurora_maps.sh
 run_perl gen_onta.pl
 run_python  bz_simple.py
 run_sh  gen_drap.sh
-run_perl genxray.pl
+run_python xray_simple.py
 run_sh  update_muf_rt_maps.sh
 
 sudo chown -R www-data:www-data "$BASE"
