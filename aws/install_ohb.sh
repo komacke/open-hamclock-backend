@@ -191,7 +191,8 @@ sudo mkdir -p \
  "$BASE/cache" \
  "$BASE/data" \
  "$BASE/htdocs/ham/HamClock" \
- "$BASE/htdocs/ham/HamClock/Bz"
+ "$BASE/htdocs/ham/HamClock/Bz" \
+ "$BASE/htdocs/ham/HamClock/geomag"
 
 #Fix www-data gmt execution error
 sudo mkdir -p /var/www/.gmt
