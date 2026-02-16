@@ -33,9 +33,7 @@
 */10 * * * * /usr/bin/python2 /opt/hamclock-backend/scripts/bz_simple.py >> /opt/hamclock-backend/logs/bz_simple.log 2>&1
 15 3 * * 0 /opt/hamclock-backend/scripts/update_pota_parks_cache.sh >> /opt/hamclock-backend/logs/update_pota_parks_cache.log 2>&1
 
-# these 2 work together so stagger runs
-15 */3 * * * /opt/hamclock-backend/scripts/update_solarflux_cache.pl >> /opt/hamclock-backend/logs/update_solarflux_cache.log 2>&1
-20 */3 * * * /opt/hamclock-backend/scripts/publish_solarflux_99.pl >> /opt/hamclock-backend/logs/publish_solarflux_99.log 2>&1
+7,37 * * * * /usr/bin/python3 /opt/hamclock-backend/scripts/flux_simple.py >> /opt/hamclock-backend/logs/flux_simple.log 2>&1
 
 # these 3 work together so stagger runs
 25 0 * * * /opt/hamclock-backend/scripts/gen_dxnews.pl >> /opt/hamclock-backend/logs/gen_dxnews.log 2>&1

@@ -368,9 +368,8 @@ run_python swind_simple.py
 run_python ssn_simple.py
 run_perl gen_ssn_history.pl
 run_sh  update_pota_parks_cache.sh
-run_perl update_solarflux_cache.pl
+run_python flux_simple.py
 run_sh  update_wx_mb_maps.sh
-run_perl publish_solarflux_99.pl
 run_perl gen_dxnews.pl
 run_perl gen_ng3k.pl
 run_perl merge_dxpeditions.pl
