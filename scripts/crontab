@@ -43,7 +43,7 @@
 35 0 * * * /opt/hamclock-backend/scripts/merge_dxpeditions.pl >> /opt/hamclock-backend/logs/merge_dxpeditions.log 2>&1
 
 5 */8 * * * /opt/hamclock-backend/scripts/gen_contest-calendar.sh >> /opt/hamclock-backend/logs/gen_contest-calendar.log 2>&1
-17 */3 * * * /opt/hamclock-backend/scripts/gen_kindex.pl >> /opt/hamclock-backend/logs/gen_kindex.log 2>&1
+*/15 * * * * /usr/bin/python3 /opt/hamclock-backend/scripts/kindex_simple.py > /opt/hamclock-backend/htdocs/ham/HamClock/geomag/kindex.txt.tmp && mv /opt/hamclock-backend/htdocs/ham/HamClock/geomag/kindex.txt.tmp /opt/hamclock-backend/htdocs/ham/HamClock/geomag/kindex.txt
 0 */6 * * * /opt/hamclock-backend/scripts/fetch_tle.sh >> /opt/hamclock-backend/logs/fetch_tle.log 2>&1
 20,50 * * * * /opt/hamclock-backend/scripts/gen_dst.sh >> /opt/hamclock-backend/logs/gen_dst.log 2>&1
 # Give NOAA time to breathe
