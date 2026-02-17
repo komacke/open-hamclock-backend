@@ -448,6 +448,7 @@ run_sh  gen_aurora.sh
 run_sh  gen_noaaswx.sh
 run_sh  update_all_sdo.sh
 run_sh  update_aurora_maps.sh
+run_sh  gen_cty_wt_mod.sh
 run_perl gen_onta.pl
 run_python  bz_simple.py
 run_sh  gen_drap.sh
