@@ -55,20 +55,12 @@ The goal is to make this as a drop-in replacement for the HamClock backend by re
 ## Interoperability
 This project generates map and data artifacts in the same formats expected by the HamClock client (e.g. zlib compressed BMP RGB565 map tiles) to support interoperability. This project is not affiliated with or endorsed by the original HamClock project or any third party. Data products are derived from public upstream sources such as NOAA SWPC and NASA
 
-## In Work
-- maps/Aurora
-Status: In Progress. We made progress by developing a script to create the base layer and have an Aurora producing script. However, we have not produced all the base layer maps to be able to support all Aurora map sizes. Only Night has been proven to be working so far at 660x330
-
 ## Known Issues
 [Active Issues](https://github.com/BrianWilkinsFL/open-hamclock-backend/issues)
 
 - Satellite planning page will cause HamClock to fail. Error message refers to a SatTool name lookup issue. This seems to only happen if two satellites are not selected by the user. To the best of our knowledge, this is a HamClock bug
 - IP Geolocation will not work if API key not set. To fix, set API key in fetchIPGeoloc.pl
-- Root directories missing on install. Manually create cache, tmp, tmp/psk-cache, and logs if missing
 - One or more SDO images may report 'File is not BMP'. If this is the case, try switching to a different image temporarily
-- Invalid data may display and it can take time for the backend to build up a suitable cache
-  - Running the server data sync script will pull down the latest aurora and DRAP stats.txt file from an active HamClock server (Currently ClearSkyInstitute):
-    - /opt/hamclock-backend/scripts/sync_server_data_files.sh
   
 # Importance of Accurate and Consistent Time
 This is worth documenting explicitly. Your backend now depends on monotonic, synchronized time. Without it, feeds appear “broken” even when structurally correct.
@@ -268,7 +260,7 @@ HamClock requests about 40+ artifacts. I have locally replicated all of them tha
 - [x] contests/contests311.txt
 - [x] dxpeds/dxpeditions.txt
 - [x] NOAASpaceWX/noaaswx.txt
-- [x] ham/HamClock/cty/cty_wt_mod-ll-dxcc.txt - Country/prefix database with lat/lon
+- [x] ham/HamClock/cty/cty_wt_mod-ll-dxcc.txt
       
 ### Dynamic Map Files
 Note: Anything under maps/ is considered a "Core Map" in HamClock
@@ -296,7 +288,7 @@ Note: Anything under maps/ is considered a "Core Map" in HamClock
 - [ ] ham/HamClock/fetchRBN.pl
 
 ### Static Files
-- [x] ham/HamClock/cities2.txt - static city file - no urgency to update this for maybe 5 years or more
+- [x] ham/HamClock/cities2.txt
 - [x] ham/HamClock/NOAASpaceWx/rank2_coeffs.txt
 
 ## Integration Testing Status
@@ -321,68 +313,3 @@ Note: Anything under maps/ is considered a "Core Map" in HamClock
 - [X] VOACAP DE DX
 - [ ] VOACAP MUF MAP
 - [ ] RBN
-
-## Requirements and Install
-
-### Dependency Install
-Note: Installer script should take care of these dependencies. If not, you can manually install them
-
-- sudo apt install -y jq
-- sudo apt install -y perl
-- sudo apt install -y lighttpd
-- sudo apt install -y imagemagick
-- sudo apt install -y libwww-perl
-- sudo apt install -y libjson-perl
-- sudo apt install -y libxml-rss-perl
-- sudo apt install -y libxml-feed-perl
-- sudo apt install -y libhtml-parser-perl
-- sudo apt install -y libeccodes-dev
-- sudo apt install -y libg2c-dev
-- sudo apt install -y libpng-dev
-- sudo apt install -y libg2c-dev
-- sudo apt install -y libeccodes-dev
-- sudo apt install -y libtext-csv-xs-perl
-- sudo apt install -y librsvg2-bin
-- sudo apt install -y ffmpeg
-- sudo apt install -y python3
-- sudo apt install -y python3-pip
-- sudo apt install -y python3-pyproj
-- sudo apt install -y python3-dev
-\# Canonical Ubuntu Way
-- sudo apt install -y python3-matplotlib
-- sudo apt install -y python3-pygrib
-- sudo apt install -y python3-grib
-\# Canonical Ubuntu Way
-- sudo apt install -y build-essential gfortran gcc make libc6-dev \\\
-libx11-dev libxaw7-dev libxmu-dev libxt-dev libmotif-dev wget (needed for VOACAPL)
-- pip install numpy
-- pip install pygrib
-- pip install matplotlib
-
-  
-## Testing
-
-After install, you can verify any script is working by using sudo -u www-data /opt/hamclock/scripts/<scriptname> <optional-param>
-
-Most cron-jobs will log to /opt/hamclock-backend/logs
-
-## Automated Pulls
-- Once per month: /opt/hamclock-backend/scripts/gen_solarflux-history.sh
-- Once per day at 12:10am: /opt/hamclock-backend/scripts/gen_swind_24hr.pl
-- Once per day at 12:15am: /opt/hamclock-backend/scripts/update_solarflux_cache.pl
-- Once per day at 12:20am: /opt/hamclock-backend/scripts/publish_solarflux_99.pl
-- Once per dat at 12:25am: /opt/hamclock-backend/scripts/gen_dxnews.pl
-- Once per day at 12:30am: /opt/hamclock-backend/scripts/gen_ng3k.pl
-- Once per day at 12:35am: /opt/hamclock-backend/scripts/merge_dxpeditions.pl
-- Every 12 hours: /opt/hamclock-backend/scripts/gen_kindex.pl
-- Every 8 hours: /opt/hamclock-backend/scripts/gen_contest-calendar.pl
-- Every 3 hours: /opt/hamclock-backend/scripts/build_esats.pl
-- Every hour: /opt/hamclock-backend/scripts/update_clouds_maps.sh
-- Every hour: /opt/hamclock-backend/scripts/update_drap_maps.sh
-- Every hour: /opt/hamclock-backend/scripts/gen_dst.sh
-- Every 30 minutes: /opt/hamclock-backend/scripts/gen_aurora.sh
-- Every 30 minutes: /opt/hamclock-backend/scripts/gen_noaaswx.sh
-- Every 5 minutes: /opt/hamclock-backend/scripts/gen_onta.pl
-- Every 5 minutes: /opt/hamclock-backend/scripts/bzgen.sh
-- Every 3 minutes: /opt/hamclock-backend/scripts/gen_drap.sh
-- Once per minute: /opt/hamclock-backend/scripts/genxray.pl
