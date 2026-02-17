@@ -25,8 +25,9 @@ RUN cd /opt/hamclock-backend && \
         data \
         htdocs && \
     mv  docker/run.sh /opt && \
-    sed 's/^\([^ #]\+[ ]\+\)\{5\}\([^>]\+\)\([> ]\+\)\?\([^ ]*\).*$/echo "  Running: \2"\n\2\3\4/' \
-        scripts/crontab > prime_crontabs.sh && \
+    # This crazy line takes the crontab file, removes the stderr redirect and adds echos to track progress. \
+    # It generates a file that will be run only once on a fresh install \
+    awk '/^[0-9\*]/ {full=$0; $1=$2=$3=$4=$5=""; sub(/^[ \t]+/, "", $0); exec=$0; sub(/[[:space:]]*[>|].*$/, "", exec); print "echo \"Running: " exec "\""; print $0; next} {print}' scripts/crontab | sed 's/[[:space:]]*2>&1//g' > prime_crontabs.sh && \
     # \
     # set permissions \
     chown -R www-data:www-data . && \
