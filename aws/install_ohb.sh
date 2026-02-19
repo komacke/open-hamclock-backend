@@ -33,6 +33,51 @@ progress() {
   printf "${BLU}[%-50s] %d%%${NC}\n" "$(printf '#%.0s' $(seq 1 $((pct/2))))" "$pct"
 }
 
+# ---- image sizes (maps) ----
+DEFAULT_SIZES="660x330,1320x660,1980x990,2640x1320,3960x1980,5280x2640,5940x2970,7920x3960"
+OHB_SIZES="${OHB_SIZES:-}"   # no default; must be supplied via flag or env
+
+usage() {
+  echo "Usage: $0 --size WxH [--size WxH ...] | --sizes WxH,WxH,..."
+  echo "  --size   WxH       One size (repeatable)"
+  echo "  --sizes  WxH,...   Comma-separated list of sizes"
+  echo "  OHB_SIZES env var  Alternative to flags"
+  echo ""
+  echo "Example: $0 --size 660x330 --size 1320x660"
+  echo "Example: $0 --sizes \"660x330,1320x660\""
+}
+
+is_size() { [[ "$1" =~ ^[0-9]+x[0-9]+$ ]]; }
+
+# Require at least one --size/--sizes argument (unless OHB_SIZES env var set)
+if [[ $# -eq 0 && -z "${OHB_SIZES:-}" ]]; then
+  echo -e "${RED}ERROR: --size is required.${NC}"
+  usage
+  exit 1
+fi
+
+# First argument must be --size, --sizes, or --help
+if [[ $# -gt 0 && "$1" != --size && "$1" != --sizes && "$1" != -h && "$1" != --help ]]; then
+  echo -e "${RED}ERROR: first argument must be --size or --sizes (got: $1)${NC}"
+  usage
+  exit 1
+fi
+
+# accept flags (also allow OHB_SIZES env var)
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --sizes)
+      shift; [[ $# -gt 0 ]] || { echo "ERROR: --sizes requires a value"; exit 1; }
+      OHB_SIZES="$1"; shift;;
+    --size)
+      shift; [[ $# -gt 0 ]] || { echo "ERROR: --size requires a value"; exit 1; }
+      if [[ -z "${_SIZES_SET:-}" ]]; then _SIZES_SET=1; OHB_SIZES=""; fi
+      OHB_SIZES+="${OHB_SIZES:+,}$1"; shift;;
+    -h|--help) usage; exit 0;;
+    *) echo "ERROR: unknown arg: $1"; usage; exit 1;;
+  esac
+done
+
 cat <<'EOF'
 
    ██████╗ ██╗  ██╗██████╗
@@ -50,8 +95,7 @@ EOF
 echo -e "${GRN}RF • Space • Propagation • Maps${NC}"
 echo
 
-# NOTE: you have 9 progress steps below
-STEPS=9
+STEPS=12
 STEP=0
 
 # ---------- sanity ----------
@@ -75,6 +119,30 @@ python3 python3-venv python3-dev python3-requests python3-matplotlib build-essen
 libx11-dev libxaw7-dev libxmu-dev libxt-dev libmotif-dev wget logrotate >/dev/null &
 spinner $!
 
+# ---------- imagemagick policy ----------
+STEP=$((STEP+1)); progress $STEP $STEPS
+echo -e "${BLU}==> Configuring ImageMagick policy for large maps${NC}"
+
+POLICY="/etc/ImageMagick-6/policy.xml"
+
+if [[ ! -f "$POLICY" ]]; then
+  echo -e "${YEL}WARN: ImageMagick policy not found at $POLICY — skipping${NC}"
+else
+  _im_ok=1
+  sudo sed -i 's/name="width" value="[^"]*"/name="width" value="16KP"/' "$POLICY"   || _im_ok=0
+  sudo sed -i 's/name="height" value="[^"]*"/name="height" value="16KP"/' "$POLICY" || _im_ok=0
+  sudo sed -i 's/name="area" value="[^"]*"/name="area" value="128MP"/' "$POLICY"    || _im_ok=0
+  sudo sed -i 's/name="disk" value="[^"]*"/name="disk" value="8GiB"/' "$POLICY"     || _im_ok=0
+  sudo sed -i 's/name="memory" value="[^"]*"/name="memory" value="2GiB"/' "$POLICY" || _im_ok=0
+
+  if [[ "$_im_ok" -eq 1 ]]; then
+    echo -e "${GRN}[✓] ImageMagick policy updated${NC}"
+  else
+    echo -e "${YEL}WARN: ImageMagick policy update partially failed — large maps may not render correctly${NC}"
+    echo -e "${YEL}      Fix manually: sudo nano $POLICY${NC}"
+  fi
+fi
+
 # ---------- forced redeploy ----------
 STEP=$((STEP+1)); progress $STEP $STEPS
 echo -e "${BLU}==> Fetching OHB (forced redeploy)${NC}"
@@ -93,56 +161,17 @@ else
 fi
 
 # git housekeeping
+echo -e "${YEL}===> Doing some git housekeeping${NC}"
+
 sudo rm -f "$BASE/.git/gc.log" || true
 sudo git -C "$BASE" prune >/dev/null || true
 sudo git -C "$BASE" gc --prune=now >/dev/null || true
 
 sudo chown -R www-data:www-data "$BASE"
 
-# ---- image sizes (maps) ----
-DEFAULT_SIZES="660x330,1320x660,1980x990,2640x1320,3960x1980,5280x2640,5940x2970,7920x3960"
-OHB_SIZES="${OHB_SIZES:-$DEFAULT_SIZES}"
-
-usage() {
-  echo "Usage: $0 [--sizes WxH,WxH,...] [--size WxH ...]"
-  echo "Example: $0 --sizes \"660x330,1320x660\""
-}
-
-is_size() { [[ "$1" =~ ^[0-9]+x[0-9]+$ ]]; }
-
-# accept flags (also allow OHB_SIZES env var)
-while [[ $# -gt 0 ]]; do
-  case "$1" in
-    --sizes)
-      shift; [[ $# -gt 0 ]] || { echo "ERROR: --sizes requires a value"; exit 1; }
-      OHB_SIZES="$1"; shift;;
-    --size)
-      shift; [[ $# -gt 0 ]] || { echo "ERROR: --size requires a value"; exit 1; }
-      if [[ -z "${_SIZES_SET:-}" ]]; then _SIZES_SET=1; OHB_SIZES=""; fi
-      OHB_SIZES+="${OHB_SIZES:+,}$1"; shift;;
-    -h|--help) usage; exit 0;;
-    *) echo "ERROR: unknown arg: $1"; usage; exit 1;;
-  esac
-done
-
-# normalize + validate + dedupe
-OHB_SIZES="${OHB_SIZES//[[:space:]]/}"
-IFS=',' read -r -a _tmp_sizes <<< "$OHB_SIZES"
-declare -A _seen=()
-_norm_sizes=()
-for s in "${_tmp_sizes[@]}"; do
-  [[ -n "$s" ]] || continue
-  is_size "$s" || { echo "ERROR: invalid size '$s' (expected WxH)"; exit 1; }
-  if [[ -z "${_seen[$s]:-}" ]]; then _seen[$s]=1; _norm_sizes+=("$s"); fi
-done
-[[ ${#_norm_sizes[@]} -gt 0 ]] || { echo "ERROR: empty size list"; exit 1; }
-OHB_SIZES="$(IFS=','; echo "${_norm_sizes[*]}")"
-
-if [[ "$OHB_SIZES" != *"660x330"* ]]; then
-  echo "WARN: size list does not include 660x330; some maps are tuned around that baseline." >&2
-fi
-
 # ---------- persist user image size selection ----------
+echo -e "${BLU}==> Persisting image size selection${NC}"
+
 sudo mkdir -p "$BASE/etc"
 echo "OHB_SIZES=\"$OHB_SIZES\"" | sudo tee "$BASE/etc/ohb-sizes.conf" >/dev/null
 sudo chown -R www-data:www-data "$BASE/etc"
@@ -156,10 +185,10 @@ sudo -u www-data mkdir -p "$BASE/tmp/worldwx"
 sudo -u www-data mkdir -p "$BASE/tmp/mpl"
 
 sudo -u www-data env HOME="$BASE/tmp" XDG_CACHE_HOME="$BASE/tmp" PIP_CACHE_DIR="$BASE/tmp/pip-cache" \
-python3 -m venv "$VENV"
+python3 -m venv "$VENV" & spinner $!
 
 sudo -u www-data env HOME="$BASE/tmp" XDG_CACHE_HOME="$BASE/tmp" PIP_CACHE_DIR="$BASE/tmp/pip-cache" \
-"$VENV/bin/pip" install --upgrade pip
+"$VENV/bin/pip" install --upgrade pip & spinner $!
 
 sudo -u www-data env HOME="$BASE/tmp" XDG_CACHE_HOME="$BASE/tmp" PIP_CACHE_DIR="$BASE/tmp/pip-cache" \
 "$VENV/bin/pip" install requests numpy pygrib matplotlib pandas >/dev/null &
@@ -457,20 +486,41 @@ run_sh  update_muf_rt_maps.sh
 
 sudo chown -R www-data:www-data "$BASE"
 # ---------- footer ----------
-VERSION=$(git -C "$BASE" describe --tags --dirty --always 2>/dev/null || echo "unknown")
+VERSION=$(git -C "$BASE" describe --tags --dirty --always 2>/dev/null)
+VERSION=${VERSION:-$(git -C "$BASE" rev-parse --short HEAD 2>/dev/null)}
+VERSION=${VERSION:-"unknown"}
+
 HOST=$(hostname)
 IP=$(hostname -I | awk '{print $1}')
 
-echo -e "${BLU}==>Integration test. You should see HTTP 200 and version 4.22${NC}"
-curl -i http://localhost/ham/HamClock/version.pl
+echo -e "${BLU}==> Integration test...${NC}"
+HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" http://localhost/ham/HamClock/version.pl)
+if [[ "$HTTP_CODE" == "200" ]]; then
+  echo -e "${GRN}[✓] HTTP $HTTP_CODE - OK${NC}"
+else
+  echo -e "${RED}[✗] HTTP $HTTP_CODE - Check lighttpd logs: sudo journalctl -u lighttpd -n 50${NC}"
+fi
+
+IP=$(hostname -I 2>/dev/null | awk '{print $1}')
+IP="${IP:-<unknown>}"
 
 echo
 echo -e "${GRN}===========================================${NC}"
 echo -e "${GRN} OHB Version : ${VERSION}${NC}"
 echo -e "${GRN} Hostname    : ${HOST}${NC}"
-echo -e "${GRN} IP Address : ${IP}${NC}"
-echo -e "${GRN} URL        : http://${IP}/ham/HamClock/${NC}"
+echo -e "${GRN} IP Address  : ${IP}${NC}"
+echo -e "${GRN} Map Sizes   : ${OHB_SIZES}${NC}"
 echo -e "${GRN}===========================================${NC}"
 echo
-echo -e "${YEL}If using WSL2 ensure systemd=true in /etc/wsl.conf${NC}"
 echo
+
+if grep -qi microsoft /proc/version 2>/dev/null; then
+  echo -e "${YEL}WSL2 detected: ensure systemd=true in /etc/wsl.conf${NC}"
+fi
+
+echo -e "${YEL}Next steps:${NC}"
+echo -e "  • Check logs for any errors or exceptions: sudo tail -f $BASE/logs/*.log"
+echo -e "  • Connect your HamClock by running the command: hamclock -b ${IP}:80"
+echo -e "  • Re-run anytime to update: sudo bash $0 --sizes \"$OHB_SIZES\""
+echo -e "${YEL}To change map sizes later, run: sudo bash $BASE/scripts/ohb-image-size.sh --size WxH${NC}"
+
