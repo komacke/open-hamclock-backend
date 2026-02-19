@@ -68,7 +68,7 @@ LANG=C
 */30 * * * * flock -n /tmp/update_sdo.lock /opt/hamclock-backend/scripts/update_all_sdo.sh >> /opt/hamclock-backend/logs/update_all_sdo.log 2>&1
 
 # maps
-*/30 * * * * /opt/hamclock-backend/scripts/update_muf_rt_maps.sh >> /opt/hamclock-backend/logs/update_muf_rt_maps.log 2>&1
+*/15 * * * * /opt/hamclock-backend/scripts/kc2g_muf_heatmap.sh >> /opt/hamclock-backend/logs/kc2g_muf_heatmap.log 2>&1
 */10 * * * * /opt/hamclock-backend/scripts/update_cloud_maps.sh >> /opt/hamclock-backend/logs/update_cloud_maps.log 2>&1
 */10 * * * * /opt/hamclock-backend/scripts/update_drap_maps.sh >> /opt/hamclock-backend/logs/update_drap_maps.log 2>&1
 6,30 * * * * /opt/hamclock-backend/scripts/update_aurora_maps.sh >> /opt/hamclock-backend/logs/update_aurora_maps.logs 2>&1

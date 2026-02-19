@@ -4,7 +4,10 @@
 # Canonical default list (keep in sync with HamClock)
 # The sizes are listed in map_sizes.txt. Empty Lines and
 # comments are ignored.
-mapfile -t DEFAULT_SIZES < <(sed -e '/^[[:blank:]]*#/d' -e '/^[[:blank:]]*$/d' "$(dirname "$0")/map_sizes.txt")
+
+echo "$(dirname "$BASH_SOURCE[0]}")/map_sizes.txt"
+
+mapfile -t DEFAULT_SIZES < <(sed -e '/^[[:blank:]]*#/d' -e '/^[[:blank:]]*$/d' "$(dirname "${BASH_SOURCE[0]}")/map_sizes.txt")
 
 # Validate a single token looks like WxH.
 ohb_is_size() {
