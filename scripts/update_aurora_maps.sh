@@ -13,13 +13,15 @@ XYZ=ovation.xyz
 echo "Fetching OVATION..."
 curl -fs https://services.swpc.noaa.gov/json/ovation_aurora_latest.json -o "$JSON"
 
-# JSON -> XYZ with longitudes in 0..360 and seam duplication
+# JSON -> XYZ in 0..360 longitude space for seamless polar gridding
+# The aurora wraps around the poles so 0/360 avoids a seam in the grid.
+# Rendering is done in -180/180 so HamClock city coordinates are correct.
 python3 <<'EOF'
 import json
 d=json.load(open("ovation.json"))
 with open("ovation.xyz","w") as f:
     for lon,lat,val in d["coordinates"]:
-        if val <= 0:
+        if val <= 2:
             continue
         if lon < 0:
             lon += 360.0
@@ -30,22 +32,67 @@ EOF
 
 echo "Gridding aurora once..."
 
-gmt xyz2grd "$XYZ" -R0/360/-90/90 -I1 -Gaurora_native.nc
-gmt grdsample aurora_native.nc -I0.1 -Gaurora_dense.nc
-gmt grdfilter aurora_dense.nc -Fg4 -D0 -Gaurora.nc
+# nearneighbor with search radius of 3 degrees gives smooth edges
+# without spreading data far from actual aurora locations.
+# No grdfilter needed — avoids equatorial bleed entirely.
+gmt nearneighbor "$XYZ" -R0/360/-90/90 -I0.5 -S3 -Gaurora.nc
 
-#cat > aurora.cpt <<EOF
-#0   0/0/0       5   0/0/0
-#5   0/120/0     20  0/255/0
-#20  0/255/0     50  255/255/0
-#50  255/255/0  100 255/0/0
-#EOF
-cat > aurora.cpt <<EOF
+cat > aurora.cpt <<'EOF'
 0    0/0/0     1    0/0/0
 1    0/40/0    20   0/120/0
 20   0/120/0  100   0/255/0
 EOF
 
+# Write BMPv4 (BITMAPV4HEADER), 16bpp RGB565, top-down — matches ClearSkyInstitute format
+make_bmp_v4_rgb565_topdown() {
+  local inraw="$1" outbmp="$2" W="$3" H="$4"
+  python3 - <<'PY' "$inraw" "$outbmp" "$W" "$H"
+import struct, sys
+inraw, outbmp, W, H = sys.argv[1], sys.argv[2], int(sys.argv[3]), int(sys.argv[4])
+
+raw = open(inraw, "rb").read()
+exp = W*H*3
+if len(raw) != exp:
+    raise SystemExit(f"RAW size {len(raw)} != expected {exp}")
+
+pix = bytearray(W*H*2)
+j = 0
+for i in range(0, len(raw), 3):
+    r = raw[i]; g = raw[i+1]; b = raw[i+2]
+    v = ((r >> 3) << 11) | ((g >> 2) << 5) | (b >> 3)
+    pix[j:j+2] = struct.pack("<H", v)
+    j += 2
+
+bfOffBits = 14 + 108
+bfSize = bfOffBits + len(pix)
+filehdr = struct.pack("<2sIHHI", b"BM", bfSize, 0, 0, bfOffBits)
+
+biSize = 108
+rmask, gmask, bmask, amask = 0xF800, 0x07E0, 0x001F, 0x0000
+cstype = 0x73524742  # sRGB
+endpoints = b"\x00"*36
+gamma = b"\x00"*12
+
+v4hdr = struct.pack("<IiiHHIIIIII",
+    biSize, W, -H, 1, 16, 3, len(pix), 0, 0, 0, 0
+) + struct.pack("<IIII", rmask, gmask, bmask, amask) \
+  + struct.pack("<I", cstype) + endpoints + gamma
+
+with open(outbmp, "wb") as f:
+    f.write(filehdr)
+    f.write(v4hdr)
+    f.write(pix)
+PY
+}
+
+zlib_compress() {
+  local in="$1" out="$2"
+  python3 -c "
+import zlib, sys
+data = open(sys.argv[1], 'rb').read()
+open(sys.argv[2], 'wb').write(zlib.compress(data, 9))
+" "$in" "$out"
+}
 
 echo "Rendering maps..."
 
@@ -55,66 +102,40 @@ mkdir -p "$OUTDIR"
 for DN in D N; do
 
 for SZ in "${SIZES[@]}"; do
-  BASE="$OUTDIR/aurora_${DN}_${SZ}"
+  BASE="$GMT_USERDIR/aurora_${DN}_${SZ}"
   PNG="${BASE}.png"
   PNG_FIXED="${BASE}_fixed.png"
   BMP="$OUTDIR/map-${DN}-${SZ}-Aurora.bmp"
-  
+
   W=${SZ%x*}
   H=${SZ#*x}
 
-  echo "  -> BASE=$BASE"
-  echo "  -> PNG=$PNG"
- 
+  echo "  -> ${DN} ${SZ}"
+
   gmt begin "$BASE" png
-    gmt coast -R0/360/-90/90 -JQ0/${W}p -Gblack -Sblack -A10000
-    # Day white veil (ONLY for D maps)
+    gmt coast -R-180/180/-90/90 -JQ0/${W}p -Gblack -Sblack -A10000
     if [[ "$DN" == "D" ]]; then
-     gmt coast -R0/360/-90/90 -JQ0/${W}p -Gwhite -Swhite -A10000 -t85
+      gmt coast -R-180/180/-90/90 -JQ0/${W}p -Gwhite -Swhite -A10000 -t85
     fi
-    gmt grdimage aurora.nc -C"$CPT" -Q -n+b -t40
-    gmt coast -R0/360/-90/90 -JQ0/${W}p -W0.75p,white -N1/0.5p,white -A10000
+    gmt grdimage aurora.nc -Caurora.cpt -Q -n+b -t40
+    gmt coast -R-180/180/-90/90 -JQ0/${W}p -W0.75p,white -N1/0.5p,white -A10000
   gmt end || { echo "gmt failed for $SZ"; continue; }
 
   convert "$PNG" -resize "${SZ}!" "$PNG_FIXED" || { echo "resize failed for $SZ"; continue; }
 
-  convert "$PNG_FIXED" -flip "$PNG_FIXED"
+  RAW="$GMT_USERDIR/aurora_${DN}_${SZ}.raw"
+  convert "$PNG_FIXED" RGB:"$RAW" || { echo "raw extract failed for $SZ"; continue; }
+  make_bmp_v4_rgb565_topdown "$RAW" "$BMP" "$W" "$H" || { echo "bmp write failed for $SZ"; continue; }
+  rm -f "$RAW" "$PNG" "$PNG_FIXED"
 
-  echo "  -> PNG_FIXED=$PNG_FIXED"
-  convert "$PNG_FIXED" \
-    -type TrueColor \
-    -define bmp:subtype=RGB565 \
-    BMP3:"$BMP" || { echo "bmp convert failed for $SZ"; continue; }
+  zlib_compress "$BMP" "${BMP}.z"
 
-  echo "  -> BMP=$BMP"
-
-# Force BMP to top-down (negative height) for HamClock
-python3 - <<EOF
-import struct
-
-with open("$BMP","r+b") as f:
-    f.seek(22)                 # biHeight offset
-    h = struct.unpack("<i", f.read(4))[0]
-    if h > 0:
-        f.seek(22)
-        f.write(struct.pack("<i", -h))
-EOF
-
-# Zlib compress (HamClock format)
-python3 - <<EOF
-import zlib
-data = open("$BMP","rb").read()
-open("$BMP.z","wb").write(zlib.compress(data,9))
-EOF
-
-rm -f "$PNG" "$BMP"
+  echo "  -> Done: $BMP"
 
 done
 
 done
 
-rm -f aurora_native.nc aurora_dense.nc aurora.nc aurora.cpt ovation.xyz
-
+rm -f aurora_native.nc aurora.nc aurora.cpt ovation.xyz
 
 echo "Done."
-
