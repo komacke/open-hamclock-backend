@@ -275,7 +275,7 @@ if ! command -v zstd >/dev/null; then
   sudo apt-get install -y zstd >/dev/null
 fi
 
-echo -e "${BLU}==>Fetching maps from GitHub...${NC}"
+echo -e "${BLU}==> Fetching maps from GitHub...${NC}"
 
 sudo -u www-data curl -fsSLO "$MAP_BASE/$MAP_ARCHIVE"
 sudo -u www-data curl -fsSLO "$MAP_BASE/$MAP_SHA"
@@ -521,6 +521,5 @@ fi
 echo -e "${YEL}Next steps:${NC}"
 echo -e "  • Check logs for any errors or exceptions: sudo tail -f $BASE/logs/*.log"
 echo -e "  • Connect your HamClock by running the command: hamclock -b ${IP}:80"
-echo -e "  • Re-run anytime to update: sudo bash $0 --sizes \"$OHB_SIZES\""
 echo -e "${YEL}To change map sizes later, run: sudo bash $BASE/scripts/ohb-image-size.sh --size WxH${NC}"
 
