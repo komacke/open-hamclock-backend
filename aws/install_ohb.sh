@@ -123,6 +123,9 @@ spinner $!
 STEP=$((STEP+1)); progress $STEP $STEPS
 echo -e "${BLU}==> Configuring ImageMagick policy for large maps${NC}"
 
+POLICY=$(find /etc/ImageMagick-* /usr/lib/ImageMagick-* -name policy.xml 2>/dev/null | head -1 || true)
+POLICY="${POLICY:-}"
+
 if [[ -z "$POLICY" ]]; then
   echo -e "${YEL}WARN: ImageMagick policy not found — skipping${NC}"
 else
