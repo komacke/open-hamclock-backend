@@ -10,3 +10,4 @@
 - [WSPR Live](https://wspr.live/)
 - [WA7BNM Weekend Contests Calendar](https://www.contestcalendar.com/)
 - [Amateur Radio Country Files](https://www.country-files.com/big-cty/)
+- [Python port of DVOACAP HF propagation prediction engine](https://github.com/skyelaird/dvoacap-python/) by Joel Morin - VE1ATM
