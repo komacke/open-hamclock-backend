@@ -22,7 +22,7 @@ echo "==> Installing dvoacap into venv..."
 sudo "$VENV/bin/pip" install --quiet "$BASE/dvoacap-python"
 
 echo "==> Creating voacap cache dir..."
-sudo mkdir -p "$BASE/tmp/voacap-cache"
+sudo mkdir -p "$BASE/cache/voacap-cache"
 
 
 echo "==> Fixing ownership..."
