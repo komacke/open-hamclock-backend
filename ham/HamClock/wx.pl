@@ -21,6 +21,7 @@ use HTTP::Tiny;
 use JSON::PP;
 use Fcntl qw(:flock);
 use File::Path qw(make_path);
+use File::Basename qw(dirname);
 
 my %weather_apis = (
     'weather.gov' => {
@@ -63,8 +64,24 @@ my $TZ_TTL    = $ENV{'TZ_CACHE_TTL'} // 3600;  # 1 hr: DST offset doesn't change
 my $TREND_WINDOW_SECS    = $ENV{'WX_TREND_WINDOW_SECS'} // 10800; # 3 hr: standard METAR/aviation pressure-tendency period
 my $TREND_STEADY_HPA     = $ENV{'WX_TREND_STEADY_HPA'}  // 1.0;   # +/- this much over the window still reads as "steady"
 my $TREND_MIN_SAMPLE_GAP = 300;                                   # don't log more than 1 sample/5 min even if polled harder
+# How far off the 3-hour target a stored sample may be and still count as "the"
+# 3-hour-old reading. This must be generous relative to real-world polling
+# cadence -- the actual HamClock client only re-polls weather every 20 min
+# (MAX_WXINFO_AGE in the client source), so consecutive samples land ~1200s
+# apart. Matching against a band narrower than that (the old code effectively
+# used TREND_MIN_SAMPLE_GAP = 300s here) means most polls simply never land a
+# sample inside the acceptance window -- the trend silently reads "steady"
+# for hours at a time even with perfectly good history on disk. 45 min gives
+# multiple polling cycles of slack on either side of the 3h mark.
+my $TREND_MATCH_TOLERANCE = $ENV{'WX_TREND_MATCH_TOLERANCE'} // 2700; # 45 min
 
 eval { make_path($CACHE_DIR) unless -d $CACHE_DIR; };
+warn "WX: FATAL: cache dir '$CACHE_DIR' missing/uncreatable ($@) -- ".
+     "pressure trend and response caching will silently fail every request\n"
+    if $@ || !-d $CACHE_DIR;
+warn "WX: cache dir '$CACHE_DIR' exists but is not writable by uid $> -- ".
+     "check ownership (a prior 'sudo' run may have created it as root)\n"
+    if -d $CACHE_DIR && !-w $CACHE_DIR;
 
 # -------------------------
 # Parse QUERY_STRING
@@ -257,9 +274,13 @@ sub _tz_timezonedb {
 # We derive this from a small local log of pressure_hPa readings for this
 # location (same 0.1-degree bucket as the weather cache) instead of calling
 # the weather provider again. Each request appends the current reading
-# (throttled to 1 per $TREND_MIN_SAMPLE_GAP) and prunes anything older than
-# $TREND_WINDOW_SECS, then compares "now" to the oldest sample still in the
-# window (~3 hours back, the standard aviation pressure-tendency period).
+# (throttled to 1 per $TREND_MIN_SAMPLE_GAP) and prunes anything too old to
+# ever be useful, then compares "now" to whichever surviving sample's age is
+# closest to $TREND_WINDOW_SECS (~3 hours back, the standard aviation
+# pressure-tendency period), accepting anything within $TREND_MATCH_TOLERANCE
+# of that mark. The tolerance matters: real polling cadence (~20 min for an
+# actual HamClock client) won't line up neatly with a fixed 3h boundary, so a
+# narrow acceptance window means most polls find no match at all.
 sub get_pressure_trend {
     my ($lat, $lng, $pressure_hPa) = @_;
     return -999 unless defined $pressure_hPa && $pressure_hPa != -999;
@@ -271,17 +292,30 @@ sub get_pressure_trend {
     push @$hist, [$now, $pressure_hPa + 0]
         if !@$hist || ($now - $hist->[-1][0]) >= $TREND_MIN_SAMPLE_GAP;
 
-    my $cutoff = $now - $TREND_WINDOW_SECS - $TREND_MIN_SAMPLE_GAP;
+    # Keep enough history that a candidate near the 3-hour mark always
+    # survives to be searched, regardless of how the actual polling cadence
+    # happens to line up with that mark.
+    my $cutoff = $now - $TREND_WINDOW_SECS - $TREND_MATCH_TOLERANCE - $TREND_MIN_SAMPLE_GAP;
     @$hist = grep { $_->[0] >= $cutoff } @$hist;
     pressure_history_set($file, $hist);
 
-    # Oldest sample that's at least ~$TREND_WINDOW_SECS old.
+    # Whichever sample's age is CLOSEST to the target window -- not just the
+    # most recent one strictly older than it. Real polling cadence rarely
+    # lines up exactly with a fixed window boundary, so insisting on a sample
+    # from the exact target second (or a narrow band past it) means most
+    # polls find nothing even with ample history on disk.
     my $target = $now - $TREND_WINDOW_SECS;
     my $past;
+    my $best_diff;
     for my $s (@$hist) {
-        $past = $s if $s->[0] <= $target && (!$past || $s->[0] > $past->[0]);
+        my $diff = abs($s->[0] - $target);
+        next if $diff > $TREND_MATCH_TOLERANCE;
+        if (!defined $best_diff || $diff < $best_diff) {
+            $past = $s;
+            $best_diff = $diff;
+        }
     }
-    return 0 unless $past;   # not enough history yet -- call it steady, not a guess
+    return 0 unless $past;   # no sample near the 3h mark yet -- call it steady, not a guess
 
     my $delta = $pressure_hPa - $past->[1];
     return 0 if abs($delta) < $TREND_STEADY_HPA;
@@ -311,7 +345,12 @@ sub pressure_history_set {
         rename($tmp, $file) or die "rename: $!";
         1;
     };
-    unlink($tmp) if !$ok && -f $tmp;
+    if (!$ok) {
+        warn "WX: pressure trend history write FAILED for '$file': $@ -- ".
+             "barometer trend will read as permanently 'steady' until this is fixed ".
+             "(check ownership/permissions of ".dirname($file).")\n";
+        unlink($tmp) if -f $tmp;
+    }
 }
 
 # -------------------------
@@ -488,7 +527,10 @@ sub cache_set {
         rename($tmp, $file) or die "rename: $!";
         1;
     };
-    unlink($tmp) if !$ok && -f $tmp;
+    if (!$ok) {
+        warn "WX: cache write FAILED for '$file': $@\n";
+        unlink($tmp) if -f $tmp;
+    }
 }
 
 # Basic sanity check so we don't create cache files from garbage query params.
