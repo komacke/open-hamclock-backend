@@ -45,6 +45,7 @@ STATUS_SETTINGS_CONF="${SCRIPT_DIR}/status_settings.conf"
 THRESH_BZ_ONTA_WX="${THRESH_BZ_ONTA_WX:-300 600 1800}"
 THRESH_DRAP_WIND="${THRESH_DRAP_WIND:-600 1200 3600}"
 THRESH_XRAY="${THRESH_XRAY:-300 600 1800}"
+THRESH_PROTON="${THRESH_PROTON:-300 600 1800}"
 THRESH_AURORA="${THRESH_AURORA:-1800 3600 7200}"
 THRESH_SDO_SPACE="${THRESH_SDO_SPACE:-3600 7200 14400}"
 THRESH_SSN="${THRESH_SSN:-7200 14400 28800}" # 2h 4h 8h
@@ -62,6 +63,7 @@ THRESH_LAUNCHES="${THRESH_LAUNCHES:-1200 2400 3600}"
 THRESH_WX_MAP="${THRESH_WX_MAP:-3600 7200 14400}"
 THRESH_SOLAR_HISTORY="${THRESH_SOLAR_HISTORY:-2592000 5184000 7776000}" # 30d 60d 90d
 THRESH_DEFAULT="${THRESH_DEFAULT:-3600 7200 14400}"
+IGNORE_FILES="${IGNORE_FILES:-"ONTA/spot.pl"}"
 
 if [ -r "$STATUS_SETTINGS_CONF" ]; then
     source "$STATUS_SETTINGS_CONF"
@@ -102,6 +104,7 @@ DATA_SUBDIRS=(
     esats
     geomag
     launches
+    proton
     solar-flux
     solar-wind
     ssn
@@ -162,6 +165,7 @@ get_thresholds() {
         Bz|ONTA|worldwx)                       echo "$THRESH_BZ_ONTA_WX" ;;
         drap|solar-wind)                       echo "$THRESH_DRAP_WIND"  ;;
         xray)                                  echo "$THRESH_XRAY"       ;;
+        proton)                                echo "$THRESH_PROTON"     ;;
         aurora)                                echo "$THRESH_AURORA"     ;;
         NOAASpaceWX|dst|geomag|solar-flux|SDO) echo "$THRESH_SDO_SPACE"  ;;
         ssn)                                   echo "$THRESH_SSN"        ;;
@@ -204,6 +208,26 @@ TRACK_DATA_FRESH=0; TRACK_DATA_RECENT=0; TRACK_DATA_AGED=0; TRACK_DATA_STALE=0; 
 TRACK_SDO_FRESH=0;  TRACK_SDO_RECENT=0;  TRACK_SDO_AGED=0;  TRACK_SDO_STALE=0;  TRACK_SDO_STATIC=0
 TRACK_MAP_FRESH=0;  TRACK_MAP_RECENT=0;  TRACK_MAP_AGED=0;  TRACK_MAP_STALE=0;  TRACK_MAP_STATIC=0
 
+should_ignore() {
+    local filepath="$1"
+    local label="$2"
+    local filename
+    filename=$(basename "$filepath")
+
+    if [ "$filename" = "ignore" ]; then
+        return 0
+    fi
+
+    local item
+    for item in $IGNORE_FILES; do
+        if [[ "$filename" == $item ]] || [[ "$label/$filename" == $item ]]; then
+            return 0
+        fi
+    done
+
+    return 1
+}
+
 calculate_stats() {
     local dir="$1"
     local label="$2"
@@ -215,6 +239,7 @@ calculate_stats() {
         if [ "$REMOTE_STATUS_SYNCED" -eq 1 ]; then
             for rfname in "${!REMOTE_FILE_STATUS[@]}"; do
                 [[ "${REMOTE_FILE_CAT[$rfname]}" == "map" ]] || continue
+                should_ignore "$dir/$rfname" "$label" && continue
                 _t=$(( _t + 1 ))
                 case "${REMOTE_FILE_STATUS[$rfname]}" in
                     FRESH)  _f=$(( _f + 1 )) ;;
@@ -234,7 +259,7 @@ calculate_stats() {
     [ ! -d "$dir" ] && return
     while IFS= read -r -d '' filepath; do
         local filename=$(basename "$filepath")
-        [ "$filename" = "ignore" ] && continue
+        should_ignore "$filepath" "$label" && continue
         _t=$(( _t + 1 ))
 
         local status_text
@@ -396,7 +421,7 @@ emit_file_row() {
     local label="$2"
     local filename
     filename=$(basename "$filepath")
-    [ "$filename" = "ignore" ] && return
+    should_ignore "$filepath" "$label" && return
 
     local mod_epoch mod_human age_sec status_class status_text age_str class_text
 
@@ -560,12 +585,44 @@ build_json_entries() {
     local label="$2"
     local -n _first_entry="$3"
 
+    # Special handling for Maps Proxy in JSON
+    if [[ "$label" == "map" && -n "$REMOTE_STATUS_HOST" ]]; then
+        if [ "$REMOTE_STATUS_SYNCED" -eq 1 ]; then
+            for rfname in $(echo "${!REMOTE_FILE_STATUS[@]}" | tr ' ' '\n' | sort); do
+                [[ "${REMOTE_FILE_CAT[$rfname]}" == "map" ]] || continue
+                local filepath="$dir/$rfname"
+                should_ignore "$filepath" "$label" && continue
+
+                local mod_human="${REMOTE_FILE_MOD[$rfname]:-unknown}"
+                local mod_epoch=$(date -u -d "$mod_human" +%s 2>/dev/null || echo 0)
+                local age_sec=$(( NOW_EPOCH - mod_epoch ))
+                age_sec=$(( age_sec < 0 ? 0 : age_sec ))
+                local status_text="${REMOTE_FILE_STATUS[$rfname]:-STALE}"
+
+                local safe_name safe_label
+                safe_name=$(printf '%s' "$rfname" | sed 's/\\/\\\\/g; s/"/\\"/g')
+                safe_label=$(printf '%s' "$label"   | sed 's/\\/\\\\/g; s/"/\\"/g')
+
+                [ "$_first_entry" -eq 0 ] && printf ',\n'
+                _first_entry=0
+                printf '    {\n'
+                printf '      "filename": "%s",\n'      "$safe_name"
+                printf '      "category": "%s",\n'      "$safe_label"
+                printf '      "modified_utc": "%s",\n'  "$mod_human"
+                printf '      "age_seconds": %d,\n'     "$age_sec"
+                printf '      "status": "%s"\n'         "$status_text"
+                printf '    }'
+            done
+        fi
+        return
+    fi
+
     [ ! -d "$dir" ] && return
 
     while IFS= read -r -d '' filepath; do
         local filename
         filename=$(basename "$filepath")
-        [ "$filename" = "ignore" ] && continue
+        should_ignore "$filepath" "$label" && continue
 
         local mod_epoch mod_human age_sec status_text
 
@@ -1051,7 +1108,7 @@ $(build_dynamic_rows)
   <div class="section-header">
     <div class="section-icon"></div>
     <span class="section-title">Data Products ($DATA_TOTAL)</span>
-    <span class="section-path">${DATA_DIR}/{Bz,NOAASpaceWX,ONTA,aurora,contests,cty,drap,dst,dxpeds,esats,geomag,solar-flux,solar-wind,ssn,worldwx,xray}</span>
+    <span class="section-path">${DATA_DIR}/{Bz,NOAASpaceWX,ONTA,activenets,aurora,contests,cty,drap,dst,dxpeds,esats,geomag,launches,proton,solar-flux,solar-wind,ssn,worldwx,xray}</span>
   </div>
   <table>
     <thead>
