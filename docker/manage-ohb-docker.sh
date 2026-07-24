@@ -344,7 +344,7 @@ EOF
 }
 
 upgrade_this_script() {
-    CHECK_LATEST_JSON=$(curl -s -A "OHB-Manager/1.0" "$GITHUB_LATEST_RELEASE_URL")
+    CHECK_LATEST_JSON=$(curl -sL -A "OHB-Manager/1.0" "$GITHUB_LATEST_RELEASE_URL")
 
     URL_LATEST_THIS=$(echo "$CHECK_LATEST_JSON" | jq -r ".assets[] | select(.browser_download_url | contains(\"$DOCKER_PROJECT\")) | .browser_download_url")
     DIGEST_LATEST_THIS=$(echo "$CHECK_LATEST_JSON" | jq -r ".assets[] | select(.browser_download_url | contains(\"$DOCKER_PROJECT\")) | .digest")
@@ -434,7 +434,7 @@ is_ohb_installed() {
     else
         echo "  git checkout not found."
     fi
-    TAG_FROM_GIT=$(curl -s -A "OHB-Manager/1.0" --connect-timeout 2 "$GITHUB_LATEST_RELEASE_URL" | jq -r '.tag_name // ""')
+    TAG_FROM_GIT=$(curl -sL -A "OHB-Manager/1.0" --connect-timeout 2 "$GITHUB_LATEST_RELEASE_URL" | jq -r '.tag_name // ""')
     echo "  Latest release available from GitHub: '$TAG_FROM_GIT'"
 
     echo
