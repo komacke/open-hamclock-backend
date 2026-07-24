@@ -123,18 +123,25 @@ ATCF_FST_URL  = "https://ftp.nhc.noaa.gov/atcf/fst/{storm_id}.fst"
 ATCF_ARC_URL  = "https://ftp.nhc.noaa.gov/atcf/archive/{year}/b{storm_id}.dat.gz"
 
 # JTWC products (W.Pacific, N.Indian, S.Hemisphere) -- NHC does NOT cover these
-# basins. The old nrlmry.navy.mil/atcf_web feed was walled off behind Akamai and
-# now returns an access-denied HTML page, so we read JTWC's ATCF data from NHC's
-# public mirror instead -- the SAME host this script already uses for NHC data.
-# We try a few candidate subdirs and use whichever actually contains JTWC
-# b-decks, rather than hard-coding a layout that may shift over time.
+# basins, and ftp.nhc.noaa.gov/atcf never has (its btk/ dir only ever contains
+# bal*/bep*/bcp* -- confirmed by the NHC ATCF README, which documents <basin>
+# as al/ep/cp only). "atcf/jtwc/" on that host 404s outright.
+#
+# Verified working source: NCAR/RAL's Tropical Cyclone Guidance Project, which
+# mirrors JTWC's b-decks (and a-decks, used here for the OFCL forecast) for
+# every global basin -- confirmed live with current bwp/bsh*.dat files as of
+# this writing. Current-season b-decks live under a year subdir; a-decks
+# (current season) sit flat at the top level. We try both layouts per file
+# since UCAR reorganizes the current year into an archive subdir after the
+# season ends.
+UCAR_REPO_BASE = "https://hurricanes.ral.ucar.edu/repository/data"
 JTWC_BTK_DIRS = [
-    "https://ftp.nhc.noaa.gov/atcf/jtwc/",   # confirmed: holds bwp/bio/bsh*.dat
-    "https://ftp.nhc.noaa.gov/atcf/btk/",    # fallback if JTWC ever merges here
+    "{base}/bdecks_open/{year}/".format(base=UCAR_REPO_BASE, year="{year}"),
+    "{base}/bdecks_open/".format(base=UCAR_REPO_BASE),
 ]
 JTWC_FST_DIRS = [
-    "https://ftp.nhc.noaa.gov/atcf/jtwc/",
-    "https://ftp.nhc.noaa.gov/atcf/fst/",
+    "{base}/adecks_open/".format(base=UCAR_REPO_BASE),
+    "{base}/adecks_open/{year}/".format(base=UCAR_REPO_BASE, year="{year}"),
 ]
 JTWC_BASINS = ("WP", "IO", "SH")
 # A storm counts as active only if its latest best-track point is this recent.
@@ -484,9 +491,18 @@ def fetch_data_url(url):
     return text
 
 
-def _fetch_first(dirs, filename):
-    """Try filename under each base dir in turn; return text for the first hit."""
+def _fetch_first(dirs, filename, year=None):
+    """
+    Try filename under each base dir in turn; return text for the first hit.
+    Dir templates may contain a literal "{year}" placeholder (used for UCAR's
+    year-subdir layout); if year is given, it's substituted in, otherwise
+    that dir is skipped.
+    """
     for base in dirs:
+        if "{year}" in base:
+            if not year:
+                continue
+            base = base.format(year=year)
         text = fetch_data_url(base + filename)
         if text:
             return text
@@ -509,7 +525,10 @@ def get_active_storm_ids_jtwc():
     uses the first that actually contains JTWC b-decks. Recency is filtered
     later, when each b-deck is read. Returns IDs like ['WP062026'].
     """
+    year = str(datetime.datetime.now(datetime.timezone.utc).year)
     for base in JTWC_BTK_DIRS:
+        if "{year}" in base:
+            base = base.format(year=year)
         listing = fetch_listing(base)
         if not listing:
             continue
@@ -528,8 +547,9 @@ def get_active_storm_ids_jtwc():
 
 
 def fetch_storm_atcf_jtwc(storm_id):
-    """Best-track records (tech=BEST) for a JTWC storm from the NHC mirror."""
-    text = _fetch_first(JTWC_BTK_DIRS, f"b{storm_id.lower()}.dat")
+    """Best-track records (tech=BEST) for a JTWC storm from the UCAR mirror."""
+    year = storm_id[-4:]
+    text = _fetch_first(JTWC_BTK_DIRS, f"b{storm_id.lower()}.dat", year=year)
     if not text:
         return []
     records = []
@@ -544,12 +564,17 @@ def fetch_storm_atcf_jtwc(storm_id):
 
 def fetch_storm_forecast_jtwc(storm_id):
     """
-    Official forecast track (tau>0) for a JTWC storm from its .fst file.
-    JTWC's .fst may not label the official forecast 'OFCL' the way NHC does,
-    so prefer OFCL/JTWC, else fall back to whichever technique has the most
-    points. One record per forecast hour. Returns [] if no .fst is mirrored.
+    Official forecast track (tau>0) for a JTWC storm, pulled from UCAR's
+    a-deck (a<id>.dat), which contains every guidance aid line -- not just
+    OFCL -- for the storm's full history across every forecast cycle ever
+    issued. JTWC's rows may not label the official forecast 'OFCL' the way
+    NHC does, so prefer OFCL/JTWC, else fall back to whichever technique has
+    the most points; then restrict to that technique's single most recent
+    cycle (max DTG) so old and new forecasts aren't mixed together. One
+    record per forecast hour.
     """
-    text = _fetch_first(JTWC_FST_DIRS, f"{storm_id.lower()}.fst")
+    year = storm_id[-4:]
+    text = _fetch_first(JTWC_FST_DIRS, f"a{storm_id.lower()}.dat", year=year)
     if not text:
         return []
     by_tech = {}
@@ -567,6 +592,11 @@ def fetch_storm_forecast_jtwc(storm_id):
             break
     else:
         chosen = max(by_tech.values(), key=len)
+    # a-decks contain every forecast cycle ever issued for the storm, not
+    # just the latest -- restrict to the most recent cycle's DTG so we don't
+    # mix stale forecasts from earlier in the storm's life with current ones.
+    latest_dtg = max(rec['dtg'] for rec in chosen)
+    chosen = [rec for rec in chosen if rec['dtg'] == latest_dtg]
     dedup = {rec['tau']: rec for rec in chosen}
     return [dedup[t] for t in sorted(dedup)]
 
@@ -581,7 +611,8 @@ def get_jtwc_name(storm_id, btk_text=None):
     suffix = {'WP': 'W', 'IO': 'B', 'SH': 'S', 'EP': 'E', 'CP': 'C'}.get(basin, '')
     designator = f"{num}{suffix}"
     if btk_text is None:
-        btk_text = _fetch_first(JTWC_BTK_DIRS, f"b{storm_id.lower()}.dat")
+        btk_text = _fetch_first(JTWC_BTK_DIRS, f"b{storm_id.lower()}.dat",
+                                 year=storm_id[-4:])
     if btk_text:
         for line in reversed(btk_text.splitlines()):
             fields = [f.strip() for f in line.split(',')]
