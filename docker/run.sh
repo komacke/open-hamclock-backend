@@ -67,14 +67,12 @@ cp /opt/hamclock-backend/docker/manage-ohb-docker.sh /opt/hamclock-backend/htdoc
 echo "Starting OHB Proxy Daemon ..."
 /usr/sbin/runuser -u www-data -- /usr/bin/perl /opt/hamclock-backend/scripts/ohb-proxy-daemon.pl daemon -l http://127.0.0.1:8081 &
 
-
 # start the web server
 echo "Starting lighttpd ..."
 /usr/sbin/lighttpd -f /etc/lighttpd/lighttpd.conf
 
 echo "Starting nginx ..."
 /usr/sbin/nginx
-
 
 # only needs to be primed when docker volume container is instantiated
 if [ ! -e /opt/hamclock-backend/htdocs/state/prime_crontabs.done ]; then
@@ -90,8 +88,8 @@ if [ ! -e /opt/hamclock-backend/htdocs/state/prime_crontabs.done ]; then
 else
     echo "OHB was previously installed and does not need to be primed."
 
-    echo "Running the one-time-clean script"
-    /opt/one-time-clean.sh
+    echo "Running the one-time-run script"
+    /opt/one-time-run.sh
 
     LAST_TIME_EPOCH=$(find /opt/hamclock-backend/htdocs -type f -printf '%T@ %p\n' | sort -n | tail -n 1 | cut -d. -f1)
     echo "Last running timestamp found is: '$(date -ud @$LAST_TIME_EPOCH)'"

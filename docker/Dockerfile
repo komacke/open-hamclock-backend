@@ -71,8 +71,9 @@ COPY --exclude=**/__pycache__/ --exclude=**/__init__.py --from=build-support /us
 COPY --exclude=docker/ohb-maps.tar.zst . /opt/hamclock-backend/
 RUN cd /opt/hamclock-backend && \
     mv  docker/run.sh /opt && \
-    mv  docker/one-time-clean.sh /opt && \
+    mv  docker/one-time-run.sh /opt && \
     mv  docker/one-time-clean.txt /opt && \
+    mv  docker/one-time-scripts.sh /opt && \
     sed -i "s/^\(OHB_MANAGER_VERSION=\).*$/\1$(cat git.version)/" docker/manage-ohb-docker.sh && \
     # \
     # cron is tightly coupled to the type of python install. cron is written for pyenv. however \
@@ -89,7 +90,7 @@ RUN cd /opt/hamclock-backend && \
              scripts/* \
              prime_crontabs.sh \
              /opt/run.sh \
-             /opt/one-time-clean.sh \
+             /opt/one-time-run.sh \
              /opt/hamclock-backend/lighttpd-conf/env-gen.sh \
              && \
     # \
