@@ -134,6 +134,12 @@ get_thresholds() {
             echo "STATIC"
             return
             ;;
+        # border/state overlay vector data (build_borders.sh / build_states.sh) --
+        # static, only regenerated when manually deleted, not on a freshness cadence
+        borders.bin|borders.bin.z|states.bin|states.bin.z)
+            echo "STATIC"
+            return
+            ;;
         map-[DN]-*-MUF-RT.*)
             echo "$THRESH_MUF_RT"
             return
