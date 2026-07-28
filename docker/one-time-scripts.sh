@@ -43,4 +43,8 @@ runuser_wrapper /opt/hamclock-backend/scripts/web15rss_fetch.py
 #############################################
 /bin/true # example
 
+# create boarders and states info for HC to draw
+runuser_wrapper /opt/hamclock-backend/scripts/utility/build_borders.sh 
+runuser_wrapper /opt/hamclock-backend/scripts/utility/build_states.sh 
+
 #############################################
