@@ -73,7 +73,7 @@ main() {
     COMMAND=$1
     case $COMMAND in
         -h|--help|help)
-            usage
+            usage_pager
             ;;
         -v|--version|version)
             ohb_manager_version
@@ -245,14 +245,25 @@ get_compose_opts() {
     [ -z "$SAVE_STICKY_VARS" ] && SAVE_STICKY_VARS=true
 }
 
+usage_pager () {
+    if [ -t 1 ]; then 
+        usage | less -F -X
+    else 
+        usage
+    fi
+}
+
 usage () {
     cat<<EOF
 $THIS <COMMAND> [options]:
     help: 
             This message
 
+    version:
+            Show the version of this utility
+
     check-docker:
-            checks docker requirements and shows version
+            checks docker and jq requirements and shows version
 
     check-ohb-install:
             checkif OHB is installed and report versions
@@ -272,10 +283,10 @@ $THIS <COMMAND> [options]:
     restart:
             restarts the OHB container. No file contents modified
 
-    up [ohb|voacap-service] (default: ohb)
-            start an existing
+    up:     
+            start an existing install
 
-    down [ohb|voacap-service] (default: ohb)
+    down:   
             stop a running install
 
     remove: 
@@ -288,7 +299,7 @@ $THIS <COMMAND> [options]:
             to take effect. See the restart command. See .env.example for more info.
             -e: .env file location
 
-    generate-docker-compose [ohb|voacap-service] (default: ohb)
+    generate-docker-compose:
             writes the docker compose file to STDOUT
 
     upgrade-me:
@@ -297,12 +308,20 @@ $THIS <COMMAND> [options]:
             overwriting itself.
 
 The following arguments come after the command:
-            -p: <port>
-                ohb: set the HTTP port (default: 80 or to current setting)
-                voacap-service: set the voacap-service port (default: 8080)
+            -a: alpha install: primary node which, for example, serves sysmsg.pl
+            -c: https certificate path
+            -e: env file for keys, etc. See .env.example
+            -h: hostname which might be different from the machine
+            -k: pskr server; "-" means this machine serves
+            -l: expose http log files in host folder
+            -m: static maps server; "-" means this machine serves
+            -r: map resolutions to support; "-" or "all" means all
+                option must be one of: ${SUPPORTED_MAP_SIZES[@]}
+            -p: <port>: set the HTTP port (default: 80 or to current setting)
+            -s: <port>: set the HTTPS port (default: 443 or to current setting)
             -t: <image tag>
             -r: screen res limits number of maps generated: '${SUPPORTED_MAP_SIZES[*]}'
-            -v: set voacap-service server host:port in ohb
+            -v: set voacap-service server host:port in ohb; "-" means this machine serves
 
 EOF
 }
@@ -905,7 +924,7 @@ determine_map_sizes() {
 
     fi
 
-    if [ "$MAP_SIZES" == all ]; then
+    if [ "$MAP_SIZES" == all -o "$MAP_SIZES" == "-" ]; then
         unset MAP_SIZES_MAPPING
     else
         MAP_SIZES_MAPPING="MAP_SIZES: $MAP_SIZES"
