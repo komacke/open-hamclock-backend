@@ -107,22 +107,8 @@ main() {
             remove_ohb
             ;;
         up)
-            if [ "$2" == voacap-service ]; then
-                REQUESTED_PROJECT=$2
-                SAVE_STICKY_VARS=false
-                shift
-            elif [ "$1" == ohb ]; then
-                REQUESTED_PROJECT=$2
-                shift
-            else
-                REQUESTED_PROJECT=ohb
-            fi
             shift && get_compose_opts "$@"
-            if [ $REQUESTED_PROJECT == voacap-service ]; then
-                docker_compose_up_voacap_service
-            else
-                docker_compose_up
-            fi
+            docker_compose_up
             ;;
         down)
             if [ "$2" == voacap-service ]; then
@@ -142,18 +128,8 @@ main() {
             fi
             ;;
         generate-docker-compose)
-            if [ "$2" == voacap-service ]; then
-                REQUESTED_PROJECT=$2
-                SAVE_STICKY_VARS=false
-                shift
-            elif [ "$2" == ohb ]; then
-                REQUESTED_PROJECT=$2
-                shift
-            else
-                REQUESTED_PROJECT=ohb
-            fi
             shift && get_compose_opts "$@"
-            generate_docker_compose $REQUESTED_PROJECT
+            generate_docker_compose
             ;;
         add-env-file)
             shift && get_compose_opts "$@"
@@ -283,10 +259,10 @@ $THIS <COMMAND> [options]:
     restart:
             restarts the OHB container. No file contents modified
 
-    up:     
+    up:
             start an existing install
 
-    down:   
+    down:
             stop a running install
 
     remove: 
@@ -593,22 +569,6 @@ docker_compose_up() {
     return $RETVAL
 }
 
-docker_compose_up_voacap_service() {
-    is_docker_installed >/dev/null || return $?
-
-    echo "Upping voacap-service ..."
-
-    export DOCKER_CLIENT_TIMEOUT=120
-    export COMPOSE_HTTP_TIMEOUT=120
-    IFS= DOCKER_COMPOSE_YML=$( docker_compose_yml_tmpl_voacap_service )
-    docker compose -f <(echo "$DOCKER_COMPOSE_YML") create
-    RETVAL=$?
-    [ $RETVAL -ne 0 ] && return $RETVAL
-    docker compose -f <(echo "$DOCKER_COMPOSE_YML") up -d
-    RETVAL=$?
-    return $RETVAL
-}
-
 docker_compose_down() {
     docker_compose_yml && docker compose -f <(echo "$DOCKER_COMPOSE_YML") down -v --remove-orphans
     RETVAL=$?
@@ -651,13 +611,7 @@ docker_compose_restart() {
 }
 
 generate_docker_compose() {
-    local SERVICE=$1
-    if [ $SERVICE == ohb ]; then
-        docker_compose_yml $SERVICE && echo "$DOCKER_COMPOSE_YML"
-    elif [ $SERVICE == voacap-service ]; then
-        IFS= DOCKER_COMPOSE_YML=$( docker_compose_yml_tmpl_voacap_service )
-        echo "$DOCKER_COMPOSE_YML"
-    fi
+    docker_compose_yml $SERVICE && echo "$DOCKER_COMPOSE_YML"
 }
 
 remove_ohb() {
