@@ -857,13 +857,6 @@ determine_http_log() {
             if [ ! -e "$HERE/logs/lighttpd" ]; then
                 mkdir -p "$HERE/logs/lighttpd"
             fi
-            if [ "$(stat -c '%u' "$HERE/logs/lighttpd" 2>/dev/null)" != "33" ]; then
-                # perms need to be set for logrotate to work
-                echo
-                echo "WARNING: folder '$HERE/logs/lighttpd' needs the following permission:"
-                echo "   sudo chown 33 $HERE/logs/lighttpd"
-                echo
-            fi
         fi
     fi
 }
@@ -1125,6 +1118,7 @@ services:
       HOST_HOSTNAME: $HOST_HOSTNAME
       PSKR_UID: 1001
       WSPR_UID: 1002
+      HOST_USER_GID: $(id -g)
       VOACAP_SERVICE_HOST: $VOACAP_SERVICE_HOST
       PSKR_MQTT_CACHE_HOST: $PSKR_MQTT_CACHE_HOST
       $MAP_SIZES_MAPPING

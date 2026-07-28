@@ -3,10 +3,13 @@
     missingok
     rotate 15
     notifempty
-    copytruncate
     sharedscripts
+    create 0640 www-data www-data
 
     postrotate
+        chgrp __NGINX_GID__ /var/log/nginx/*.log
+        nginx -s reopen
+
         TODAY=$(date +%Y%m%d)
         TARGET="/var/log/nginx/access.log-$TODAY"
  

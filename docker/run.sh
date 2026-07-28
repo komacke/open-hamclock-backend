@@ -72,6 +72,19 @@ echo "Starting lighttpd ..."
 /usr/sbin/lighttpd -f /etc/lighttpd/lighttpd.conf
 
 echo "Starting nginx ..."
+# Enforce your exact required permissions and ownership
+if findmnt -M /var/log/nginx >/dev/null 2>&1; then
+    NGINX_GID=$HOST_USER_GID
+else
+    NGINX_GID=www-data
+fi
+# Pre-create the log files if they don't exist
+touch /var/log/nginx/access.log /var/log/nginx/error.log
+chown www-data:$NGINX_GID /var/log/nginx/*.log
+chmod 0640 /var/log/nginx/*.log
+# logrotate handles group correctly
+sed -i "s/__NGINX_GID__/$NGINX_GID/" /etc/logrotate.d/nginx
+# Hand over execution to Nginx
 /usr/sbin/nginx
 
 # only needs to be primed when docker volume container is instantiated
