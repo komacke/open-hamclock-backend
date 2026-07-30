@@ -28,11 +28,15 @@
 #
 # ============================================================
 # One-off OHB script: builds the states/provinces overlay file,
-# same idea as build_borders.sh. Uses Natural Earth's 1:50m admin-1 dataset
-# rather than 1:110m -- the 110m admin-1 theme is effectively US-only, the
-# 50m one has real global coverage (states/provinces/oblasts/etc for most
-# countries). This is only meant to be shown at HamClock's closest zoom
-# level, so the extra detail/file size is the right tradeoff here.
+# same idea as build_borders.sh. Uses Natural Earth's 1:10m admin-1 dataset --
+# public domain, no attribution required, same as borders.bin. Bumped up
+# from the earlier 1:50m theme for finer coastline/border precision; the
+# admin-1 unit definitions themselves (which regions count as a "state")
+# are the same at either scale, this just changes how smoothly they're
+# traced. A few small nations/microstates (Monaco, Andorra, Liechtenstein,
+# San Marino, etc) aren't covered at admin-1 in this dataset -- acceptable
+# tradeoff for staying public domain instead of switching to a dataset
+# that requires attribution.
 #
 set -euo pipefail
 
@@ -48,7 +52,7 @@ if [[ -s "$OUTDIR/states.bin" && -s "$OUTDIR/states.bin.z" ]]; then
     exit 0
 fi
 
-SRC_URL="https://raw.githubusercontent.com/nvkelso/natural-earth-vector/master/geojson/ne_50m_admin_1_states_provinces.geojson"
+SRC_URL="https://raw.githubusercontent.com/nvkelso/natural-earth-vector/master/geojson/ne_10m_admin_1_states_provinces.geojson"
 
 need() { command -v "$1" >/dev/null 2>&1 || { echo "ERROR: missing command: $1" >&2; exit 1; }; }
 need curl
@@ -57,7 +61,7 @@ need python3
 TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
 
-echo "downloading Natural Earth 1:50m admin-1 states/provinces..."
+echo "downloading Natural Earth 1:10m admin-1 states/provinces..."
 curl -fsSL "$SRC_URL" -o "$TMP/states.geojson"
 
 BIN="$TMP/states.bin"
@@ -88,21 +92,47 @@ for feat in d["features"]:
 
 with open(out, "wb") as f:
     f.write(b"HCBD")                    # same magic/format as borders.bin
-    f.write(struct.pack("<BH", 1, len(rings)))
 
+    # uint16 point count per ring -- the 1:10m theme's finer tracing means a
+    # handful of very complex coastlines/borders can still exceed this after
+    # quantizing to 0.01 degree, so dedupe consecutive duplicate points and,
+    # failing that, uniformly downsample rather than overflow the format.
+    MAX_PTS = 65535
     total_pts = 0
+    n_downsampled = 0
+    n_degenerate = 0
+    out_rings = []
     for ring in rings:
         pts = []
         for lon, lat in ring:
             lon_cd = max(-18000, min(18000, int(round(lon * 100))))
             lat_cd = max(-9000, min(9000, int(round(lat * 100))))
-            pts.append((lon_cd, lat_cd))
+            if not pts or pts[-1] != (lon_cd, lat_cd):
+                pts.append((lon_cd, lat_cd))
+
+        if len(pts) > MAX_PTS:
+            step = (len(pts) + MAX_PTS - 1) // MAX_PTS
+            pts = pts[::step]
+            n_downsampled += 1
+
+        if len(pts) < 3:
+            n_degenerate += 1
+            continue
+
+        out_rings.append(pts)
+        total_pts += len(pts)
+
+    f.write(struct.pack("<BH", 1, len(out_rings)))
+    for pts in out_rings:
         f.write(struct.pack("<H", len(pts)))
         for lon_cd, lat_cd in pts:
             f.write(struct.pack("<hh", lon_cd, lat_cd))
-        total_pts += len(pts)
 
-print(f"encoded {len(rings)} rings, {total_pts} points -> {out}", file=sys.stderr)
+print(f"encoded {len(out_rings)} rings, {total_pts} points -> {out}", file=sys.stderr)
+if n_downsampled:
+    print(f"note: {n_downsampled} ring(s) exceeded {MAX_PTS} points and were downsampled", file=sys.stderr)
+if n_degenerate:
+    print(f"note: {n_degenerate} degenerate ring(s) (<3 points after dedup) were dropped", file=sys.stderr)
 PY
 
 python3 - "$BIN" <<'PY'
