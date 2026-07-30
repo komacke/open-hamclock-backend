@@ -86,6 +86,7 @@ main() {
                 ;;
         esac
     done
+    shift $((OPTIND - 1))
 
     if [[ -n "$1" ]]; then
         echo
