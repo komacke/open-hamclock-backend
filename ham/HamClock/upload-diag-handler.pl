@@ -30,7 +30,7 @@ my $MIN_FREE_KB   = 2048;           # Keep at least 2 MB free as a buffer
 
 # Matches: HamClock-[id]/[n].[n] OR HamClock-[id]/[n].[n]b[dd]
 my $user_agent = $ENV{'HTTP_USER_AGENT'} || '';
-unless ($user_agent =~ /^HamClock-.*\/(\d+)\.(\d+)(b\d{2})?$/i) {
+unless ($user_agent =~ /^HamClock-.*\/(\d+)\.(\d+)(b\d{2})?(\s+|$)/i) {
     print "Status: 404 Not Found\n";
     print "Content-Type: text/html\n\n";
     print "<html><head><title>404 Not Found</title></head><body><h1>404 Not Found</h1></body></html>";
