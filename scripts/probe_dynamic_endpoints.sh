@@ -224,11 +224,12 @@ first=1
     healthy=$(( active + idle ))
 
     # Fetch custom metrics from prometheus that uses vector/loki
-    count_24h=$(curl -A "$UA" -sS --max-time "$TIMEOUT" -G "$PROMETHEUS_URL" \
-          --data-urlencode 'query=count(count_over_time(nginx_requests_total{serial!="unknown"}[24h]) > 0)' 2>/dev/null \
+    count_24h_new=$(curl -A "$UA" -sS --max-time "$TIMEOUT" -G "$PROMETHEUS_URL" \
+          --data-urlencode 'query=count(sum by (serial) (count_over_time(nginx_requests_total[24h]) > 0))' 2>/dev/null \
             | jq -r '.data.result[0].value[1] // 0')
     # Fetch custom metrics from node-exporter that uses our awk script
     count_24h_old=$(curl -A "$UA" -sS --max-time "$TIMEOUT" "$NODE_EXPORTER_URL" 2>/dev/null | grep "^count_24_hours" | awk '{print $2}')
+    count_24h="$count_24h_new"
     # Ensure count_24h is a valid integer
     if ! [[ "$count_24h" =~ ^[0-9]+$ ]]; then
         count_24h=0
