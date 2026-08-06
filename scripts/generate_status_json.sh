@@ -81,6 +81,10 @@ MIRROR_HOST="${MIRROR:-ohb.hamclock.app}"
 OUTPUT="/opt/hamclock-backend/htdocs/ham/HamClock/status.html"
 OUTPUT_JSON="${OUTPUT%.html}.json"
 DYNAMIC_SIDECAR="/opt/hamclock-backend/htdocs/ham/HamClock/dynamic_status.json"
+NODE_EXPORTER_URL="${HAMCLOCK_NODE_EXPORTER_URL:-http://node-exporter:9100/metrics}"
+PROMETHEUS_URL="${HAMCLOCK_PROMETHEUS_URL:-http://prometheus:9090/api/v1/query}"
+QUERY_TIMEOUT="${HAMCLOCK_QUERY_TIMEOUT:-15}"
+UA="${HAMCLOCK_UA:-OHB-generate/1.0}"
 CALLSIGN="OHB" # your station callsign
 VERSION=$(cat /opt/hamclock-backend/git.version 2>/dev/null | cut -b -12)
 VERSION="${VERSION:-unknown}" # Provide a default if git.version is missing or empty
@@ -349,7 +353,18 @@ DYN_HEALTHY=0
 DYN_EMPTY=0
 DYN_FAILED=0
 DYN_TIMEOUT=0
-DYN_COUNT_24H=0
+# Fetch custom 24h count metrics directly from prometheus (new) and node-exporter (old)
+count_24_new=$(curl -A "$UA" -sS --max-time "$QUERY_TIMEOUT" -G "$PROMETHEUS_URL" \
+      --data-urlencode 'query=count(sum by (serial) (count_over_time(nginx_requests_total[24h]) > 0))' 2>/dev/null \
+        | jq -r '.data.result[0].value[1] // 0')
+count_24_old=$(curl -A "$UA" -sS --max-time "$QUERY_TIMEOUT" "$NODE_EXPORTER_URL" 2>/dev/null | grep "^count_24_hours" | awk '{print $2}')
+if ! [[ "$count_24_new" =~ ^[0-9]+$ ]]; then
+    count_24_new=0
+fi
+if ! [[ "$count_24_old" =~ ^[0-9]+$ ]]; then
+    count_24_old=0
+fi
+DYN_COUNT_24H="$count_24_new"
 DYN_GENERATED=""
 DYN_AGE_SEC=0
 DYN_AVAILABLE=0
@@ -369,7 +384,6 @@ if [ -r "$DYNAMIC_SIDECAR" ]; then
         DYN_EMPTY=$(echo "$DYNAMIC_SIDECAR_CONTENT" | jq -r '.summary.empty // 0')
         DYN_FAILED=$(echo "$DYNAMIC_SIDECAR_CONTENT" | jq -r '.summary.failed // 0')
         DYN_TIMEOUT=$(echo "$DYNAMIC_SIDECAR_CONTENT" | jq -r '.summary.timeout // 0')
-        DYN_COUNT_24H=$(echo "$DYNAMIC_SIDECAR_CONTENT" | jq -r '.summary.count_24h // 0')
         DYN_GENERATED=$(echo "$DYNAMIC_SIDECAR_CONTENT" | jq -r '.generated_utc // ""')
         # Backward-compat: if sidecar predates "healthy" key, fall back to active
         [ "$DYN_HEALTHY" -eq 0 ] && [ "$DYN_ACTIVE" -gt 0 ] && DYN_HEALTHY="$DYN_ACTIVE"
@@ -692,7 +706,9 @@ build_json() {
         printf '    "dynamic_active": %d,\n'     "$DYN_ACTIVE"
         printf '    "dynamic_idle": %d,\n'       "$DYN_IDLE"
         printf '    "dynamic_healthy": %d,\n'    "$DYN_HEALTHY"
-        printf '    "dynamic_count_24h": %d,\n'  "$DYN_COUNT_24H"
+        printf '    "count_24h": %d,\n'             "$DYN_COUNT_24H"
+        printf '    "unique_hamclocks_24h": %d,\n'  "$DYN_COUNT_24H"
+        printf '    "dynamic_count_24h": %d,\n'     "$DYN_COUNT_24H"
         printf '    "total_files": %d\n'         "$(( DATA_TOTAL + SDO_TOTAL + MAP_TOTAL ))"
         printf '  },\n'
 
