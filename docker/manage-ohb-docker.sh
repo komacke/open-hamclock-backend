@@ -468,6 +468,7 @@ is_ohb_installed() {
         get_current_pskr_image_tag
         get_current_wspr_image_tag
         get_current_voacap_image_tag
+        get_current_subnet
         echo "  OHB version:           '$CURRENT_TAG'"
         echo "  Docker image:          '$CURRENT_IMAGE_BASE:$CURRENT_TAG'"
         echo "  Docker image (pskr):   '$CURRENT_PSKR_IMAGE_BASE:$CURRENT_PSKR_TAG'"
@@ -487,7 +488,8 @@ is_ohb_installed() {
         echo "  Alpha install:         '$STICKY_ALPHA_INSTALL'"
         echo "  Proxy maps:            '$STICKY_PROXY_MAPS'"
         echo "  Service hostname:      '$STICKY_HOST_HOSTNAME'"
-        echo "  Docker subnet:         '$STICKY_SUBNET'"
+        [ $STICKY_SUBNET == - ] && SUBNET_STATIC_MSG="dynamic" || SUBNET_STATIC_MSG="static"
+        echo "  Docker subnet:         '$CURRENT_SUBNET' ($SUBNET_STATIC_MSG)"
     fi
 
     if ! is_container_running; then
