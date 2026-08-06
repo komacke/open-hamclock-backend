@@ -296,6 +296,7 @@ The following arguments come after the command:
             -k: pskr server; "-" means this machine serves
             -l: expose http log files in host folder
             -m: static maps server; "-" means this machine serves
+            -n: set docker network subnet to a specific value; otherwise docker picks
             -r: map resolutions to support; "-" or "all" means all
                 option must be one of: ${SUPPORTED_MAP_SIZES[@]}
             -p: <port>: set the HTTP port (default: 80 or to current setting)
