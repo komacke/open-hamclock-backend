@@ -24,6 +24,7 @@ DEFAULT_WSPR_LIVE_CACHE_TAG=1.3
 
 GITHUB_LATEST_RELEASE_URL="https://api.github.com/repos/openhamclock/open-hamclock-backend/releases/latest"
 OHB_HTDOCS_DVC=ohb-htdocs
+OHB_NETWORK=ohb
 IMAGE_BASE=komacke/open-hamclock-backend
 
 # Get our directory locations in order
@@ -53,6 +54,7 @@ DEFAULT_PSKR_MQTT_CACHE_HOST=pskr-mqtt-cache:5000
 DEFAULT_ALPHA_INSTALL="true"
 DEFAULT_PROXY_MAPS="false"
 DEFAULT_HOST_HOSTNAME=$HOSTNAME
+DEFAULT_SUBNET=-
 
 # the following env is for sticky settings
 STICKY_ENV_FILE=$DOCKER_PROJECT.env
@@ -155,7 +157,7 @@ main() {
 }
 
 get_compose_opts() {
-    while getopts ":a:c:e:h:k:l:m:p:r:s:t:v:" opt; do
+    while getopts ":a:c:e:h:k:l:m:n:p:r:s:t:v:" opt; do
         case $opt in
             a)
                 REQUESTED_ALPHA_INSTALL="$OPTARG"
@@ -181,6 +183,9 @@ get_compose_opts() {
                 ;;
             m)
                 REQUESTED_PROXY_MAPS="$OPTARG"
+                ;;
+            n)
+                REQUESTED_SUBNET="$OPTARG"
                 ;;
             r)
                 REQUESTED_MAP_SIZES="${OPTARG,,}"
@@ -222,9 +227,9 @@ get_compose_opts() {
 }
 
 usage_pager () {
-    if [ -t 1 ]; then 
+    if [ -t 1 ]; then
         usage | less -F -X
-    else 
+    else
         usage
     fi
 }
@@ -232,7 +237,7 @@ usage_pager () {
 usage () {
     cat<<EOF
 $THIS <COMMAND> [options]:
-    help: 
+    help:
             This message
 
     version:
@@ -329,6 +334,7 @@ STICKY_PSKR_MQTT_CACHE_HOST="$PSKR_MQTT_CACHE_HOST"
 STICKY_ALPHA_INSTALL="$ALPHA_INSTALL"
 STICKY_PROXY_MAPS="$PROXY_MAPS"
 STICKY_HOST_HOSTNAME="$HOST_HOSTNAME"
+STICKY_SUBNET="$SUBNET"
 EOF
         mv "$TMP_STICKY" "$STICKY_ENV_FILE"
     else
@@ -480,6 +486,7 @@ is_ohb_installed() {
         echo "  Alpha install:         '$STICKY_ALPHA_INSTALL'"
         echo "  Proxy maps:            '$STICKY_PROXY_MAPS'"
         echo "  Service hostname:      '$STICKY_HOST_HOSTNAME'"
+        echo "  Docker subnet:         '$STICKY_SUBNET'"
     fi
 
     if ! is_container_running; then
@@ -721,6 +728,15 @@ get_current_https_port() {
     fi
 }
 
+get_current_subnet() {
+    DOCKER_SUBNET=$(docker network inspect $OHB_NETWORK 2>/dev/null | jq -r '.[].IPAM.Config[]?.Subnet | select(. and contains("."))')
+    if [ "$DOCKER_SUBNET" != 'null' ]; then
+        CURRENT_SUBNET=$DOCKER_SUBNET
+    else
+        unset CURRENT_SUBNET
+    fi
+}
+
 get_current_image_tag() {
     CURRENT_DOCKER_IMAGE=$(docker inspect $CONTAINER 2>/dev/null | jq -r '.[0].Config.Image')
     if [ "$CURRENT_DOCKER_IMAGE" != 'null' ]; then
@@ -800,11 +816,39 @@ determine_https_port() {
     fi
 
     if [ "$HTTPS_PORT" == "-" ]; then
-        HTTPS_PORT_MAPPING=""
+        unset HTTPS_PORT_MAPPING
     else
         # if there was a :, it was probably IP:PORT; otherwise make sure there's a colon for port only
         [[ $HTTPS_PORT =~ : ]] || HTTPS_PORT=":$HTTPS_PORT"
         HTTPS_PORT_MAPPING="- $HTTPS_PORT:443"
+    fi
+}
+
+determine_subnet() {
+    get_current_subnet
+
+    # first precedence
+    if [ -n "$REQUESTED_SUBNET" ]; then
+        SUBNET=$REQUESTED_SUBNET
+
+    # second precedence
+    elif [ -n "$CURRENT_SUBNET" -a "$CURRENT_SUBNET" != ':' ]; then
+        SUBNET=$CURRENT_SUBNET
+
+    # third precedence
+    elif [ -n "$STICKY_SUBNET" ]; then
+        SUBNET=$STICKY_SUBNET
+
+    # fourth precedence
+    else
+        SUBNET=$DEFAULT_SUBNET
+
+    fi
+
+    if [ "$SUBNET" == "-" ]; then
+        SUBNET_MAPPING=""
+    else
+        SUBNET_MAPPING="config: [{ subnet: \"$SUBNET\"}]"
     fi
 }
 
@@ -1049,7 +1093,7 @@ determine_sysmsg_file() {
         fi
         SYSMSG_FILE_MAPPING="- \"$SYSMSG_FILE_PATH:/opt/hamclock-backend/data/msg\""
     else
-        SYSMSG_FILE_MAPPING=
+        unset SYSMSG_FILE_MAPPING
     fi
 }
 
@@ -1065,6 +1109,7 @@ docker_compose_yml() {
     determine_proxy_maps
     determine_host_hostname
     determine_sysmsg_file
+    determine_subnet
 
     determine_tag || return $?
     IMAGE=$IMAGE_BASE:$TAG
@@ -1103,7 +1148,7 @@ services:
       - $HTTP_PORT:80
       $HTTPS_PORT_MAPPING
     volumes:
-      - ohb-htdocs:/opt/hamclock-backend/htdocs
+      - $OHB_HTDOCS_DVC:/opt/hamclock-backend/htdocs
       $SYSMSG_FILE_MAPPING
       $EXTERNAL_HTTP_LOG_MAPPING
       $HTTPS_CERT_MAPPING
@@ -1129,10 +1174,10 @@ EOF
     restart: unless-stopped
     $CPUSHARE_PSKR_MQTT_CACHE
     networks:
-      - ohb
+      - $OHB_NETWORK
     volumes:
       - type: volume
-        source: ohb-htdocs
+        source: $OHB_HTDOCS_DVC
         target: /data
         volume:
           subpath: pskr
@@ -1161,10 +1206,10 @@ EOF
       WSPR_API_UPSTREAM_DISABLED: "true"
       WSPR_RETENTION_HOURS: "24"
     networks:
-      - ohb
+      - $OHB_NETWORK
     volumes:
       - type: volume
-        source: ohb-htdocs
+        source: $OHB_HTDOCS_DVC
         target: /data
         volume:
           subpath: wspr
@@ -1188,7 +1233,7 @@ EOF
     environment:
       LOG_LEVEL: INFO
     networks:
-      - ohb
+      - $OHB_NETWORK
     shm_size: "2gb"    # /dev/shm for fast VOACAP temp files
     mem_limit: "4gb"
     cpus: "4.0"
@@ -1205,19 +1250,18 @@ EOF
 
     cat<<EOF
 networks:
-  ohb:
+  $OHB_NETWORK:
     driver: bridge
-    name: ohb
+    name: $OHB_NETWORK
     enable_ipv6: true
     ipam:
-     driver: default
-     config:
-       - subnet: 172.21.0.0/16
+      driver: default
+      $SUBNET_MAPPING
     driver_opts:
-      com.docker.network.bridge.name: ohb
+      com.docker.network.bridge.name: $OHB_NETWORK
 
 volumes:
-  ohb-htdocs:
+  $OHB_HTDOCS_DVC:
     external: true
 EOF
 }
