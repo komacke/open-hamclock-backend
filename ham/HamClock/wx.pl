@@ -127,8 +127,21 @@ if (defined $lat && defined $lng && looks_like_coord($lat) && looks_like_coord($
     # approx_timezone_seconds() is intentionally last -- it has no DST awareness.
     $wx{timezone} = get_timezone_secs($lat, $lng);
 
-    # Weather: serve from cache if fresh; otherwise fetch and repopulate cache.
-    get_weather_cached($lat, $lng, \%wx);
+    if ($ENV{HTTP_X_RATE_LIMITED} || $ENV{RATE_LIMITED}) {
+        # Rate limited by Nginx: do not call upstream APIs.
+        # Use stale cache if available, otherwise serve default values.
+        my $file = cache_key('wx', $lat, $lng);
+        my $stale = cache_get($file, 2**31);
+        if ($stale) {
+            %wx = (%wx, %$stale);
+            $wx{_cache} = 'rate_limited_stale';
+        } else {
+            $wx{_cache} = 'rate_limited_default';
+        }
+    } else {
+        # Weather: serve from cache if fresh; otherwise fetch and repopulate cache.
+        get_weather_cached($lat, $lng, \%wx);
+    }
 
     # Barometer trend: like timezone, this is computed fresh every request
     # (not tied to $WX_TTL) since it's just a local file read/append, not an
@@ -216,6 +229,10 @@ sub get_timezone_secs {
     my $file = cache_key('tz', $lat, $lng);
     my $cached = cache_get($file, $TZ_TTL);
     return $cached->{offset} if $cached && defined $cached->{offset};
+
+    if ($ENV{HTTP_X_RATE_LIMITED} || $ENV{RATE_LIMITED}) {
+        return approx_timezone_seconds($lng);
+    }
 
     # 1. Open-Meteo timezone API -- free, no key, returns IANA name + utc_offset_seconds (DST-aware)
     my $tz = _tz_open_meteo($lat, $lng);
