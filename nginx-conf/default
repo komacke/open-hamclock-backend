@@ -54,7 +54,7 @@ server {
     # Fallback location when rate limited: proxies to wx.pl with X-Rate-Limited header
     # so wx.pl returns cached/default weather data with HTTP 200 OK, preventing client thundering herd
     location @wx_rate_limited {
-        proxy_pass http://127.0.0.1:8080/ham/HamClock/wx.pl;
+        proxy_pass http://127.0.0.1:8080;
         proxy_http_version 1.0;
 
         proxy_ignore_client_abort on;
