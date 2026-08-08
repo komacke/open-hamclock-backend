@@ -15,4 +15,3 @@
 /tmp/
 
 # things to delete in this release
-/state/one-time-clean.txt
