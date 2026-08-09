@@ -52,6 +52,7 @@ import os
 import json
 import time
 import urllib.request
+from pathlib import Path
 
 GROUPS_URL = ("https://www.iota-world.org/islands-on-the-air/downloads/"
               "download-file.html?path=groups.json")
@@ -67,6 +68,8 @@ MAX_NAME_LEN = 40          # keep cache lines short for embedded (ESP32) clients
 TIMEOUT_S = 30
 USER_AGENT = "HamClock-fetchIOTA/1.0 (+https://ohb.works/)"
 
+TMP_DIR = Path("/opt/hamclock-backend/tmp")
+OUTFILE = Path("/opt/hamclock-backend/htdocs/ham/HamClock/ONTA/iota.txt")
 
 def fetch_json(url):
     req = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
@@ -130,15 +133,6 @@ def build_lines(records):
 
 
 def main():
-    if len(sys.argv) != 2:
-        print(f"usage: {sys.argv[0]} outfile", file=sys.stderr)
-        return 1
-    outfile = sys.argv[1]
-
-    if os.path.isdir (outfile) or outfile.endswith ("/"):
-        print(f"fetchIOTA: outfile must be a file path, not a directory: {outfile!r}\n"
-              f"           did you mean {os.path.join(outfile, 'iota.txt')!r} ?", file=sys.stderr)
-        return 1
 
     try:
         raw = fetch_json(GROUPS_URL)
@@ -155,16 +149,22 @@ def main():
         print("fetchIOTA: no groups parsed, refusing to overwrite cache", file=sys.stderr)
         return 1
 
-    tmp = outfile + ".tmp"
+    # write into TMP_DIR first, then atomically move into place. os.replace() is only
+    # atomic when src and dst are on the same filesystem -- both live under
+    # /opt/hamclock-backend here, so this holds as long as that's not itself a mount
+    # boundary split across two devices.
+    TMP_DIR.mkdir (parents=True, exist_ok=True)
+    tmp = TMP_DIR / (OUTFILE.name + ".tmp")
+
     with open(tmp, "w") as f:
         f.write(f"# IOTA group reference cache -- generated "
                  f"{time.strftime('%Y-%m-%d %H:%M:%S', time.gmtime())} UTC\n")
         f.write(f"# source: {GROUPS_URL}\n")
         for line in lines:
             f.write(line + "\n")
-    os.replace(tmp, outfile)   # atomic swap: client never sees a half-written file
+    os.replace(tmp, OUTFILE)   # atomic swap: client never sees a half-written file
 
-    print(f"fetchIOTA: wrote {len(lines)} groups to {outfile}")
+    print(f"fetchIOTA: wrote {len(lines)} groups to {OUTFILE}")
     return 0
 
 
