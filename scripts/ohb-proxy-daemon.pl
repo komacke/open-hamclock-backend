@@ -136,7 +136,7 @@ get '/ham/HamClock/lightning/strikes.pl' => sub {
     my $lat1   = $do_filter ? $lat * $DEG2RAD : 0;
 
     my $out = "";
-    for my $s (@{$data->{strikes}}) {
+    for my $s (reverse @{$data->{strikes}}) {
         my $age_s = int(($now_ms - $s->{strikeTime}) / 1000);
         next if $age_s < 0 || $age_s > $maxage;
 
