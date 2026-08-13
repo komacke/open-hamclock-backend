@@ -197,7 +197,10 @@ sub proxy_request {
            : ($endpoint =~ /fetchPSK/ ? $ua_pskr : $ua_voacap);
 
     my $original_ua = $c->req->headers->user_agent // 'OHB-Proxy/1.0';
-    my $tx = $ua->build_tx(GET => $url, {'User-Agent' => $original_ua});
+    my $tx = $ua->build_tx(GET => $url, {
+        'User-Agent' => $original_ua,
+        'Connection' => 'close',
+    });
 
     my $headers_sent = 0;
     my $aborted = 0;
