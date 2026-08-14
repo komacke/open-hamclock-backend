@@ -100,6 +100,7 @@ LANG=C
 # ============================================================================
 */2 * * * *    $SCRIPTS/cron-wrapper.sh $SCRIPTS/fetch_wwff_cache.pl
 1-59/2 * * * * $SCRIPTS/cron-wrapper.sh $SCRIPTS/gen_onta.pl
+1-59/2 * * * * $SCRIPTS/cron-wrapper.sh $SCRIPTS/gen_iota.pl
 
 0 3 * * 1      $SCRIPTS/cron-wrapper.sh $SCRIPTS/update_wwff_cache.pl
 0 4 * * 1,4    $SCRIPTS/cron-wrapper.sh $SCRIPTS/update_sota_cache.pl
