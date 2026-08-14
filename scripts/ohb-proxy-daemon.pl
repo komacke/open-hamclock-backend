@@ -33,9 +33,9 @@ my $voacap_host = $ENV{VOACAP_SERVICE_HOST}  || 'voacap-service:8080';
 
 # Connection Pools for each upstream target
 my $ua_pskr = Mojo::UserAgent->new
-    ->connect_timeout(4)
-    ->inactivity_timeout(8)
-    ->request_timeout(12)
+    ->connect_timeout(8)
+    ->inactivity_timeout(12)
+    ->request_timeout(15)
     ->max_redirects(0);
 
 my $ua_band = Mojo::UserAgent->new
@@ -136,7 +136,7 @@ get '/ham/HamClock/lightning/strikes.pl' => sub {
     my $lat1   = $do_filter ? $lat * $DEG2RAD : 0;
 
     my $out = "";
-    for my $s (@{$data->{strikes}}) {
+    for my $s (reverse @{$data->{strikes}}) {
         my $age_s = int(($now_ms - $s->{strikeTime}) / 1000);
         next if $age_s < 0 || $age_s > $maxage;
 
@@ -197,7 +197,10 @@ sub proxy_request {
            : ($endpoint =~ /fetchPSK/ ? $ua_pskr : $ua_voacap);
 
     my $original_ua = $c->req->headers->user_agent // 'OHB-Proxy/1.0';
-    my $tx = $ua->build_tx(GET => $url, {'User-Agent' => $original_ua});
+    my $tx = $ua->build_tx(GET => $url, {
+        'User-Agent' => $original_ua,
+        'Connection' => 'close',
+    });
 
     my $headers_sent = 0;
     my $aborted = 0;
