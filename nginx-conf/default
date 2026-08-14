@@ -24,6 +24,9 @@ server {
     # Buffer up to 2MB request bodies in RAM to prevent disk I/O latency and HTTP 499 client timeouts
     client_body_buffer_size 2m;
     client_body_timeout 60s;
+    client_header_timeout 60s;
+    send_timeout 60s;
+    reset_timedout_connection on;
 
     # Rate limit /ham/HamClock/wx.pl to 50 requests per minute
     location = /ham/HamClock/wx.pl {
@@ -43,8 +46,8 @@ server {
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
 
-        # Disable buffering for CGI responsiveness
-        proxy_buffering off;
+        # Buffer response to free backend Lighttpd connection immediately
+        proxy_buffering on;
 
         # Match VOACAP timeouts (up to 300s)
         proxy_read_timeout 300s;
@@ -65,7 +68,7 @@ server {
         proxy_set_header X-Forwarded-Proto $scheme;
         proxy_set_header X-Rate-Limited "1";
 
-        proxy_buffering off;
+        proxy_buffering on;
 
         proxy_read_timeout 300s;
         proxy_send_timeout 360s;
@@ -84,8 +87,8 @@ server {
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
 
-        # Disable buffering for CGI responsiveness
-        proxy_buffering off;
+        # Buffer response to free backend Lighttpd connection immediately
+        proxy_buffering on;
 
         # Match VOACAP timeouts (up to 300s)
         proxy_read_timeout 300s;
