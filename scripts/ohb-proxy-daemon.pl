@@ -33,7 +33,7 @@ my $voacap_host = $ENV{VOACAP_SERVICE_HOST}  || 'voacap-service:8080';
 
 # Connection Pools for each upstream target
 my $ua_pskr = Mojo::UserAgent->new
-    ->connect_timeout(4)
+    ->connect_timeout(8)
     ->inactivity_timeout(12)
     ->request_timeout(15)
     ->max_redirects(0);
