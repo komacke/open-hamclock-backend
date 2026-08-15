@@ -62,6 +62,7 @@ THRESH_TROPO="${THRESH_TROPO:-12600 23400 43200}"
 THRESH_LAUNCHES="${THRESH_LAUNCHES:-1200 2400 3600}"
 THRESH_WX_MAP="${THRESH_WX_MAP:-3600 7200 14400}"
 THRESH_SOLAR_HISTORY="${THRESH_SOLAR_HISTORY:-2592000 5184000 7776000}" # 30d 60d 90d
+THRESH_IOTA="${THRESH_IOTA:-90000 108000 172800}" # 25h 30h 48h
 THRESH_DEFAULT="${THRESH_DEFAULT:-3600 7200 14400}"
 IGNORE_FILES="${IGNORE_FILES:-"ONTA/spot.pl"}"
 
@@ -166,6 +167,10 @@ get_thresholds() {
             ;;
         esats-freq.txt)
             echo "$THRESH_ESATS_FREQ"
+            return
+            ;;
+        iota.txt)
+            echo "$THRESH_IOTA"
             return
             ;;
     esac
