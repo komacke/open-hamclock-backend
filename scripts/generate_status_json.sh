@@ -406,23 +406,18 @@ if [ -z "$BETA_VERSION" ] && [ -r "$CACHE_DIR/HC_RELEASE-beta.tag" ]; then
     BETA_VERSION=$(head -n 1 "$CACHE_DIR/HC_RELEASE-beta.tag" | tr -d '[:space:]' | sed -E 's/^[vV]//')
 fi
 
-BETA_BASE=""
-if [ -n "$BETA_VERSION" ]; then
-    BETA_BASE=$(echo "$BETA_VERSION" | sed -E 's/b[0-9]+$//; s/^[vV]//')
-fi
-
 count_beta_24=0
-if [ -n "$BETA_BASE" ]; then
+if [ -n "$BETA_VERSION" ]; then
     count_beta_24=$(curl -A "$UA" -sS --max-time "$QUERY_TIMEOUT" -G "$PROMETHEUS_URL" \
-        --data-urlencode "query=count(sum by (serial) (count_over_time(nginx_requests_total{version=~\"v?${BETA_BASE}b.*\"}[24h]) > 0))" 2>/dev/null \
+        --data-urlencode "query=count(sum by (serial) (count_over_time(nginx_requests_total{version=~\"v?${BETA_VERSION}\"}[24h]) > 0))" 2>/dev/null \
         | jq -r '.data.result[0].value[1] // 0')
 fi
 if ! [[ "$count_beta_24" =~ ^[0-9]+$ ]]; then
     count_beta_24=0
 fi
 DYN_COUNT_BETA_24H="$count_beta_24"
-if [ -n "$BETA_BASE" ]; then
-    BETA_LABEL="HamClocks on ${BETA_BASE} beta (24h)"
+if [ -n "$BETA_VERSION" ]; then
+    BETA_LABEL="HamClocks on ${BETA_VERSION} (24h)"
 else
     BETA_LABEL="HamClocks on Beta (24h)"
 fi
@@ -774,7 +769,6 @@ build_json() {
         printf '    "stable_count_24h": %d,\n'      "$DYN_COUNT_STABLE_24H"
         printf '    "count_stable_24h": %d,\n'      "$DYN_COUNT_STABLE_24H"
         printf '    "beta_version": "%s",\n'        "$BETA_VERSION"
-        printf '    "beta_base_version": "%s",\n'   "$BETA_BASE"
         printf '    "beta_count_24h": %d,\n'        "$DYN_COUNT_BETA_24H"
         printf '    "count_beta_24h": %d,\n'        "$DYN_COUNT_BETA_24H"
         printf '    "total_files": %d\n'         "$(( DATA_TOTAL + SDO_TOTAL + MAP_TOTAL ))"
