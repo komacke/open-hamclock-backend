@@ -392,9 +392,9 @@ if ! [[ "$count_stable_24" =~ ^[0-9]+$ ]]; then
 fi
 DYN_COUNT_STABLE_24H="$count_stable_24"
 if [ -n "$STABLE_VERSION" ]; then
-    STABLE_LABEL="HamClocks v${STABLE_VERSION} (24h)"
+    STABLE_LABEL="HamClocks on ${STABLE_VERSION} (24h)"
 else
-    STABLE_LABEL="HamClocks Stable (24h)"
+    STABLE_LABEL="HamClocks on Stable (24h)"
 fi
 DYN_GENERATED=""
 DYN_AGE_SEC=0
