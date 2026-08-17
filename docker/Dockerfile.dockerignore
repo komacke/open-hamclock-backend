@@ -2,4 +2,6 @@
 # don't include these files in the image
 **/*.env
 **/.git*
+**/.agent*
+**/.vscode*
 /notes
