@@ -24,7 +24,8 @@ THIS=$(basename $0)
 HERE="$(cd "$(dirname "$0")" && pwd)"
 RETVAL=0
 DVC_MOUNT=/opt/hamclock-backend/htdocs
-STATE_FILE=$DVC_MOUNT/state/${THIS%.*}.txt
+CLEAN_STATE_FILE=$DVC_MOUNT/state/${THIS%.*}.txt
+SCRIPT_STATE_FILE=/opt/hamclock-backend/cache/${THIS%.*}.txt
 GIT_VERSION_FILE=/opt/hamclock-backend/git.version
 CLEAN_FILES_LIST=$HERE/one-time-clean.txt
 RUN_SCRIPTS_LIST=$HERE/one-time-scripts.sh
@@ -34,29 +35,35 @@ main() {
     [[ ! -r "$CLEAN_FILES_LIST" ]] && exit $RETVAL
 
     # see if it was run before
-    check_if_run
+    if check_if_clean; then
+        clean_files
+        # mark as clean
+        mark_clean
+    fi
 
-    clean_files
-    run_scripts
-
-    # mark as run
-    mark_run
+    if check_if_scripts_run; then
+        run_scripts
+        # mark as run
+        mark_run
+    fi
 
     return
 }
 
-check_if_run() {
+check_if_clean() {
     # Only do something if the file wasn't already created and marked
     # by the image version
-    if cmp --silent "$STATE_FILE" "$GIT_VERSION_FILE"; then
+    if cmp --silent "$CLEAN_STATE_FILE" "$GIT_VERSION_FILE"; then
         echo "One-time clean was done previously."
-        exit $RETVAL
+        return 1
+    else
+        return 0
     fi
 }
 
-mark_run() {
-    # mark the file as from this image and having been run already.
-    cp "$GIT_VERSION_FILE" "$STATE_FILE"
+mark_clean() {
+    # mark the file as from this image and having been cleaned already.
+    cp "$GIT_VERSION_FILE" "$CLEAN_STATE_FILE"
 }
 
 clean_files() {
@@ -79,8 +86,24 @@ clean_files() {
     done < <(grep -vE '^(\s*#|\s*$)' "$CLEAN_FILES_LIST" | tr -d '\r')
 }
 
+check_if_scripts_run() {
+    # Only do something if the file wasn't already created and marked
+    # by the image version
+    if cmp --silent "$SCRIPT_STATE_FILE" "$GIT_VERSION_FILE"; then
+        echo "One-time script was done previously."
+        return 1
+    else
+        return 0
+    fi
+}
+
 run_scripts() {
     bash $RUN_SCRIPTS_LIST
+}
+
+mark_run() {
+    # mark the file as run since container was created
+    cp "$GIT_VERSION_FILE" "$SCRIPT_STATE_FILE"
 }
 
 main "$@"
