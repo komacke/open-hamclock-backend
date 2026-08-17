@@ -75,6 +75,7 @@ fi
 DATA_DIR="/opt/hamclock-backend/htdocs/ham/HamClock"
 MAPS_DIR="/opt/hamclock-backend/htdocs/ham/HamClock/maps"
 SDO_DIR="/opt/hamclock-backend/htdocs/ham/HamClock/SDO"
+CACHE_DIR="/opt/hamclock-backend/cache"
 
 # Determine the central mirror host
 MIRROR_HOST="${MIRROR:-ohb.hamclock.app}"
@@ -370,6 +371,32 @@ if ! [[ "$count_24_old" =~ ^[0-9]+$ ]]; then
     count_24_old=0
 fi
 DYN_COUNT_24H="$count_24_new"
+
+# Read latest stable version from cache
+STABLE_VERSION=""
+if [ -r "$CACHE_DIR/HC_RELEASE-stable.txt" ]; then
+    STABLE_VERSION=$(head -n 1 "$CACHE_DIR/HC_RELEASE-stable.txt" | tr -d '[:space:]')
+fi
+if [ -z "$STABLE_VERSION" ] && [ -r "$CACHE_DIR/HC_RELEASE-stable.tag" ]; then
+    STABLE_VERSION=$(head -n 1 "$CACHE_DIR/HC_RELEASE-stable.tag" | tr -d '[:space:]' | sed -E 's/^[vV]//')
+fi
+
+count_stable_24=0
+if [ -n "$STABLE_VERSION" ]; then
+    prom_ver_regex="^v?$(echo "$STABLE_VERSION" | sed 's/\./\\./g')\$"
+    count_stable_24=$(curl -A "$UA" -sS --max-time "$QUERY_TIMEOUT" -G "$PROMETHEUS_URL" \
+        --data-urlencode "query=count(sum by (serial) (count_over_time(nginx_requests_total{version=~\"$prom_ver_regex\"}[24h]) > 0))" 2>/dev/null \
+        | jq -r '.data.result[0].value[1] // 0')
+fi
+if ! [[ "$count_stable_24" =~ ^[0-9]+$ ]]; then
+    count_stable_24=0
+fi
+DYN_COUNT_STABLE_24H="$count_stable_24"
+if [ -n "$STABLE_VERSION" ]; then
+    STABLE_LABEL="HamClocks v${STABLE_VERSION} (24h)"
+else
+    STABLE_LABEL="HamClocks Stable (24h)"
+fi
 DYN_GENERATED=""
 DYN_AGE_SEC=0
 DYN_AVAILABLE=0
@@ -714,6 +741,9 @@ build_json() {
         printf '    "count_24h": %d,\n'             "$DYN_COUNT_24H"
         printf '    "unique_hamclocks_24h": %d,\n'  "$DYN_COUNT_24H"
         printf '    "dynamic_count_24h": %d,\n'     "$DYN_COUNT_24H"
+        printf '    "stable_version": "%s",\n'      "$STABLE_VERSION"
+        printf '    "stable_count_24h": %d,\n'      "$DYN_COUNT_STABLE_24H"
+        printf '    "count_stable_24h": %d,\n'      "$DYN_COUNT_STABLE_24H"
         printf '    "total_files": %d\n'         "$(( DATA_TOTAL + SDO_TOTAL + MAP_TOTAL ))"
         printf '  },\n'
 
@@ -1085,6 +1115,10 @@ cat << HTML_HEAD
   <div class="summary-item">
     <span class="summary-label">Unique HamClocks (24h)</span>
     <div class="summary-value">${DYN_COUNT_24H}</div>
+  </div>
+  <div class="summary-item">
+    <span class="summary-label">${STABLE_LABEL}</span>
+    <div class="summary-value">${DYN_COUNT_STABLE_24H}</div>
   </div>
 </div>
 
