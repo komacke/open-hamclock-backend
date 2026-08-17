@@ -383,9 +383,8 @@ fi
 
 count_stable_24=0
 if [ -n "$STABLE_VERSION" ]; then
-    prom_ver_regex="^v?$(echo "$STABLE_VERSION" | sed 's/\./\\./g')\$"
     count_stable_24=$(curl -A "$UA" -sS --max-time "$QUERY_TIMEOUT" -G "$PROMETHEUS_URL" \
-        --data-urlencode "query=count(sum by (serial) (count_over_time(nginx_requests_total{version=~\"$prom_ver_regex\"}[24h]) > 0))" 2>/dev/null \
+        --data-urlencode "query=count(sum by (serial) (count_over_time(nginx_requests_total{version=~\"v?${STABLE_VERSION}\"}[24h]) > 0))" 2>/dev/null \
         | jq -r '.data.result[0].value[1] // 0')
 fi
 if ! [[ "$count_stable_24" =~ ^[0-9]+$ ]]; then
