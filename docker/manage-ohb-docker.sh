@@ -516,6 +516,13 @@ upgrade_ohb() {
     echo "Upgrading OHB ..."
 
     REQUEST_DOCKER_PULL=true
+
+    # Remove only the web container so docker compose create can create the upgraded
+    # container for .env injection, while leaving auxiliary services running.
+    if is_container_exists; then
+        docker rm -f $CONTAINER >/dev/null 2>&1
+    fi
+
     echo "Starting the container ..."
     if docker_compose_up; then
         echo "Container started successfully."
