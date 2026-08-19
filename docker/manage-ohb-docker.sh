@@ -16,7 +16,7 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 # at release time, this value is set to the tagged release
-OHB_MANAGER_VERSION=latest
+OHB_MANAGER_VERSION=edge
 # tags to use
 DEFAULT_VOACAP_SERVICE_TAG=1.19
 DEFAULT_PSKR_MQTT_CACHE_TAG=1.19
@@ -1080,7 +1080,7 @@ determine_tag() {
         return
     fi
 
-    # upgrade shouldn't use the current tag unless it's 'latest'. 
+    # upgrade shouldn't use the current tag unless it's 'edge'. 
     # GIT_TAG would be empty and we'll get DEFAULT_TAG
 
     # second precedence

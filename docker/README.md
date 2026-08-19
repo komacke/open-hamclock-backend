@@ -114,10 +114,10 @@ Double check your docker version:
 ./manage-ohb-docker.sh check-docker
 ```
 
-Do an install. Note that if you are running it from a git checkout, it will use the git tag or branch name. If you are running it standalone you should provide it the tag you want to install. It defaults to ```latest```:
+Do an install. Note that if you are running it from a git checkout, it will use the git tag or branch name. If you are running it standalone you should provide it the tag you want to install. It defaults to ```edge```:
 
 ```
-# put in the version you want or set to latest
+# put in the version you want or set to 'edge'
 ./manage-ohb-docker.sh install -t <insert version here>
 ```
 
@@ -144,7 +144,7 @@ Go to the project readme and look for information about the '-b' otion to hamclo
 ## The steps if you want to create your own image
 You'll need a git checkout of the version you want to build. See above for getting a git clone and checkout.
 
-The build-image.sh utility will create an image for you based on the git branch you have checked out. If you aren't on a git tag, the resulting image will be tagged 'latest':
+The build-image.sh utility will create an image for you based on the git branch you have checked out. If you aren't on a git tag, the resulting image will be tagged 'edge':
 ```
 ./build-image.sh
 ```
@@ -169,7 +169,7 @@ If it shows the latest version at the end, then use it to upgrade OHB:
 ```
 
 ## versions v0.23 and older
-Get the latest manager utility and run the manager utility with 'upgrade' command. Like install, it defaults to the current version, or falls back to latest. If the default version isn't what you want, provide the -t option.
+Get the latest manager utility and run the manager utility with 'upgrade' command. Like install, it defaults to the current version, or falls back to 'edge'. If the default version isn't what you want, provide the -t option.
 ```
 # Get the version you want. Let's assume it's version: <version>
 curl -sL -o manage-ohb-docker.sh https://github.com/openhamclock/open-hamclock-backend/releases/download/<version>/manage-ohb-docker-<version>.sh
