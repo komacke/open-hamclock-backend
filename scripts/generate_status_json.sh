@@ -62,6 +62,7 @@ THRESH_TROPO="${THRESH_TROPO:-12600 23400 43200}"
 THRESH_LAUNCHES="${THRESH_LAUNCHES:-1200 2400 3600}"
 THRESH_WX_MAP="${THRESH_WX_MAP:-3600 7200 14400}"
 THRESH_SOLAR_HISTORY="${THRESH_SOLAR_HISTORY:-2592000 5184000 7776000}" # 30d 60d 90d
+THRESH_IOTA="${THRESH_IOTA:-90000 108000 172800}" # 25h 30h 48h
 THRESH_DEFAULT="${THRESH_DEFAULT:-3600 7200 14400}"
 IGNORE_FILES="${IGNORE_FILES:-"ONTA/spot.pl"}"
 
@@ -74,6 +75,7 @@ fi
 DATA_DIR="/opt/hamclock-backend/htdocs/ham/HamClock"
 MAPS_DIR="/opt/hamclock-backend/htdocs/ham/HamClock/maps"
 SDO_DIR="/opt/hamclock-backend/htdocs/ham/HamClock/SDO"
+CACHE_DIR="/opt/hamclock-backend/cache"
 
 # Determine the central mirror host
 MIRROR_HOST="${MIRROR:-ohb.hamclock.app}"
@@ -166,6 +168,10 @@ get_thresholds() {
             ;;
         esats-freq.txt)
             echo "$THRESH_ESATS_FREQ"
+            return
+            ;;
+        iota.txt)
+            echo "$THRESH_IOTA"
             return
             ;;
     esac
@@ -365,6 +371,56 @@ if ! [[ "$count_24_old" =~ ^[0-9]+$ ]]; then
     count_24_old=0
 fi
 DYN_COUNT_24H="$count_24_new"
+
+# Read latest stable version from cache
+STABLE_VERSION=""
+if [ -r "$CACHE_DIR/HC_RELEASE-stable.txt" ]; then
+    STABLE_VERSION=$(head -n 1 "$CACHE_DIR/HC_RELEASE-stable.txt" | tr -d '[:space:]')
+fi
+if [ -z "$STABLE_VERSION" ] && [ -r "$CACHE_DIR/HC_RELEASE-stable.tag" ]; then
+    STABLE_VERSION=$(head -n 1 "$CACHE_DIR/HC_RELEASE-stable.tag" | tr -d '[:space:]' | sed -E 's/^[vV]//')
+fi
+
+count_stable_24=0
+if [ -n "$STABLE_VERSION" ]; then
+    count_stable_24=$(curl -A "$UA" -sS --max-time "$QUERY_TIMEOUT" -G "$PROMETHEUS_URL" \
+        --data-urlencode "query=count(sum by (serial) (count_over_time(nginx_requests_total{version=~\"v?${STABLE_VERSION}\"}[24h]) > 0))" 2>/dev/null \
+        | jq -r '.data.result[0].value[1] // 0')
+fi
+if ! [[ "$count_stable_24" =~ ^[0-9]+$ ]]; then
+    count_stable_24=0
+fi
+DYN_COUNT_STABLE_24H="$count_stable_24"
+if [ -n "$STABLE_VERSION" ]; then
+    STABLE_LABEL="HamClocks on ${STABLE_VERSION} (24h)"
+else
+    STABLE_LABEL="HamClocks on Stable (24h)"
+fi
+
+# Read latest beta version from cache
+BETA_VERSION=""
+if [ -r "$CACHE_DIR/HC_RELEASE-beta.txt" ]; then
+    BETA_VERSION=$(head -n 1 "$CACHE_DIR/HC_RELEASE-beta.txt" | tr -d '[:space:]')
+fi
+if [ -z "$BETA_VERSION" ] && [ -r "$CACHE_DIR/HC_RELEASE-beta.tag" ]; then
+    BETA_VERSION=$(head -n 1 "$CACHE_DIR/HC_RELEASE-beta.tag" | tr -d '[:space:]' | sed -E 's/^[vV]//')
+fi
+
+count_beta_24=0
+if [ -n "$BETA_VERSION" ]; then
+    count_beta_24=$(curl -A "$UA" -sS --max-time "$QUERY_TIMEOUT" -G "$PROMETHEUS_URL" \
+        --data-urlencode "query=count(sum by (serial) (count_over_time(nginx_requests_total{version=~\"v?${BETA_VERSION}\"}[24h]) > 0))" 2>/dev/null \
+        | jq -r '.data.result[0].value[1] // 0')
+fi
+if ! [[ "$count_beta_24" =~ ^[0-9]+$ ]]; then
+    count_beta_24=0
+fi
+DYN_COUNT_BETA_24H="$count_beta_24"
+if [ -n "$BETA_VERSION" ]; then
+    BETA_LABEL="HamClocks on ${BETA_VERSION} (24h)"
+else
+    BETA_LABEL="HamClocks on Beta (24h)"
+fi
 DYN_GENERATED=""
 DYN_AGE_SEC=0
 DYN_AVAILABLE=0
@@ -709,6 +765,12 @@ build_json() {
         printf '    "count_24h": %d,\n'             "$DYN_COUNT_24H"
         printf '    "unique_hamclocks_24h": %d,\n'  "$DYN_COUNT_24H"
         printf '    "dynamic_count_24h": %d,\n'     "$DYN_COUNT_24H"
+        printf '    "stable_version": "%s",\n'      "$STABLE_VERSION"
+        printf '    "stable_count_24h": %d,\n'      "$DYN_COUNT_STABLE_24H"
+        printf '    "count_stable_24h": %d,\n'      "$DYN_COUNT_STABLE_24H"
+        printf '    "beta_version": "%s",\n'        "$BETA_VERSION"
+        printf '    "beta_count_24h": %d,\n'        "$DYN_COUNT_BETA_24H"
+        printf '    "count_beta_24h": %d,\n'        "$DYN_COUNT_BETA_24H"
         printf '    "total_files": %d\n'         "$(( DATA_TOTAL + SDO_TOTAL + MAP_TOTAL ))"
         printf '  },\n'
 
@@ -822,7 +884,7 @@ cat << HTML_HEAD
     /* ── Summary bar ── */
     .summary {
       display: grid;
-      grid-template-columns: repeat(2, 1fr);
+      grid-template-columns: repeat(6, 1fr);
       border-bottom: 1px solid var(--border);
       background: var(--panel);
     }
@@ -844,17 +906,19 @@ cat << HTML_HEAD
     .summary-item:has(.summary-link):active { transform: translateY(1px); }
     .summary-item:has(.summary-link):hover .summary-label { color: var(--accent); }
 
-    .summary-item:nth-child(2n) { border-right: none; }
-
-    /* If the total number of items is odd, make the last one span both columns */
-    .summary-item:last-child:nth-child(odd) {
-      grid-column: span 2;
+    .summary-half {
+      grid-column: span 3;
+    }
+    .summary-half:nth-of-type(2n) {
       border-right: none;
     }
-
-    .summary-item:nth-last-child(-n+2) { border-bottom: none; }
-    /* If 2nd-to-last item is even, it sits above a spanning last item; give it a border-bottom */
-    .summary-item:nth-last-child(2):nth-child(even) { border-bottom: 1px solid var(--border); }
+    .summary-third {
+      grid-column: span 2;
+      border-bottom: none;
+    }
+    .summary-third:last-child {
+      border-right: none;
+    }
 
     .summary-label { font-size: 0.62rem; letter-spacing: 0.06em; color: var(--muted); text-transform: uppercase; }
     .summary-value {
@@ -1034,14 +1098,20 @@ cat << HTML_HEAD
         margin-bottom: -2px;
       }
     }
+    @media (max-width: 768px) {
+      .summary  { grid-template-columns: 1fr; }
+      .summary-half, .summary-third {
+        grid-column: span 1;
+        border-right: none;
+        border-bottom: 1px solid var(--border);
+      }
+      .summary-item:last-child {
+        border-bottom: none;
+      }
+    }
     @media (max-width: 380px) {
       .callsign { font-size: 1.15rem; }
       .clock    { font-size: 0.72rem; }
-      .summary  { grid-template-columns: 1fr; }
-      .summary-item:nth-child(2n)        { border-right: none; }
-      .summary-item:nth-last-child(-n+2) { border-bottom: 1px solid var(--border); }
-      .summary-item:last-child:nth-child(odd) { grid-column: auto; }
-      .summary-item:last-child           { border-bottom: none; }
     }
   </style>
 </head>
@@ -1061,25 +1131,33 @@ cat << HTML_HEAD
 </header>
 
 <div class="summary">
-  <div class="summary-item">
+  <div class="summary-item summary-half">
     <a href="#dynamic-endpoints" class="summary-link"><span class="summary-label">Dynamic Endpoints ($DYN_TOTAL)</span></a>
     <div class="summary-value">$(fmt_dyn_summary "dynamic-endpoints" "$DYN_ACTIVE" "$DYN_IDLE" "$DYN_EMPTY" "$DYN_TIMEOUT" "$DYN_FAILED")</div>
   </div>
-  <div class="summary-item">
+  <div class="summary-item summary-half">
     <a href="#data-products" class="summary-link"><span class="summary-label">Data Product Files ($DATA_TOTAL)</span></a>
     <div class="summary-value">$(fmt_stat_summary "data-products" "$DATA_FRESH" "$DATA_RECENT" "$DATA_AGED" "$DATA_STALE" "$DATA_STATIC")</div>
   </div>
-  <div class="summary-item">
+  <div class="summary-item summary-half">
     <a href="#sdo" class="summary-link"><span class="summary-label">SDO Files ($SDO_TOTAL)</span></a>
     <div class="summary-value">$(fmt_stat_summary "sdo" "$SDO_FRESH" "$SDO_RECENT" "$SDO_AGED" "$SDO_STALE" "$SDO_STATIC")</div>
   </div>
-  <div class="summary-item">
+  <div class="summary-item summary-half">
     <a href="#maps" class="summary-link"><span class="summary-label">Map Files ($MAP_TOTAL)</span></a>
     <div class="summary-value">$(fmt_stat_summary "maps" "$MAP_FRESH" "$MAP_RECENT" "$MAP_AGED" "$MAP_STALE" "$MAP_STATIC")</div>
   </div>
-  <div class="summary-item">
+  <div class="summary-item summary-third">
     <span class="summary-label">Unique HamClocks (24h)</span>
     <div class="summary-value">${DYN_COUNT_24H}</div>
+  </div>
+  <div class="summary-item summary-third">
+    <span class="summary-label">${STABLE_LABEL}</span>
+    <div class="summary-value">${DYN_COUNT_STABLE_24H}</div>
+  </div>
+  <div class="summary-item summary-third">
+    <span class="summary-label">${BETA_LABEL}</span>
+    <div class="summary-value">${DYN_COUNT_BETA_24H}</div>
   </div>
 </div>
 

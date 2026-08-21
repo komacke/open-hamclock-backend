@@ -19,7 +19,7 @@
 OHB_MANAGER_VERSION=latest
 # tags to use
 DEFAULT_VOACAP_SERVICE_TAG=1.19
-DEFAULT_PSKR_MQTT_CACHE_TAG=1.18
+DEFAULT_PSKR_MQTT_CACHE_TAG=1.19
 DEFAULT_WSPR_LIVE_CACHE_TAG=1.3
 
 GITHUB_LATEST_RELEASE_URL="https://api.github.com/repos/openhamclock/open-hamclock-backend/releases/latest"
@@ -872,10 +872,21 @@ determine_http_log() {
     fi
 
     if [ "$ENABLE_EXTERNAL_HTTP_LOG" == true ]; then
-        EXTERNAL_HTTP_LOG_MAPPING="- $HERE/logs/lighttpd:/var/log/nginx:rw"
+        EXTERNAL_HTTP_LOG_FOLDER="$HERE/logs/lighttpd"
+        EXTERNAL_HTTP_LOG_MAPPING="- $EXTERNAL_HTTP_LOG_FOLDER:/var/log/nginx:rw"
         if [ "${FUNCNAME[2]}" == "docker_compose_up" ]; then
-            if [ ! -e "$HERE/logs/lighttpd" ]; then
-                mkdir -p "$HERE/logs/lighttpd"
+            if [ ! -e "$EXTERNAL_HTTP_LOG_FOLDER" ]; then
+                mkdir -p "$EXTERNAL_HTTP_LOG_FOLDER"
+            fi
+
+            GROUP_NAME=$(stat -c "%G" "$EXTERNAL_HTTP_LOG_FOLDER")
+            PERMS=$(stat -c "%A" "$EXTERNAL_HTTP_LOG_FOLDER")
+            GROUP_WRITE="${PERMS:5:1}"
+            WORLD_WRITE="${PERMS:8:1}"
+            if { [ "$GROUP_NAME" != "root" ] && [ "$GROUP_WRITE" = "w" ]; } || [ "$WORLD_WRITE" = "w" ]; then
+                echo
+                echo "WARNING: '$EXTERNAL_HTTP_LOG_FOLDER' must be group root or not group writable."
+                echo
             fi
         fi
     fi

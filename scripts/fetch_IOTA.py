@@ -68,7 +68,7 @@ MAX_NAME_LEN = 40          # keep cache lines short for embedded (ESP32) clients
 TIMEOUT_S = 30
 USER_AGENT = "HamClock-fetchIOTA/1.0 (+https://ohb.works/)"
 
-TMP_DIR = Path("/opt/hamclock-backend/tmp")
+TMP_DIR = Path("/opt/hamclock-backend/htdocs/tmp")
 OUTFILE = Path("/opt/hamclock-backend/htdocs/ham/HamClock/ONTA/iota.txt")
 
 def fetch_json(url):
