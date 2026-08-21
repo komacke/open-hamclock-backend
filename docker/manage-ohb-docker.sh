@@ -16,7 +16,7 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 # at release time, this value is set to the tagged release
-OHB_MANAGER_VERSION=latest
+OHB_MANAGER_VERSION=edge
 # tags to use
 DEFAULT_VOACAP_SERVICE_TAG=1.19
 DEFAULT_PSKR_MQTT_CACHE_TAG=1.19
@@ -56,8 +56,8 @@ DEFAULT_PROXY_MAPS="false"
 DEFAULT_HOST_HOSTNAME=$HOSTNAME
 DEFAULT_SUBNET=-
 
-# the following env is for sticky settings
-STICKY_ENV_FILE=$DOCKER_PROJECT.env
+# the following file is for sticky settings
+STICKY_SETTINGS_FILE=$DOCKER_PROJECT.env
 REQUEST_DOCKER_PULL=false
 RETVAL=0
 
@@ -135,6 +135,7 @@ main() {
             ;;
         add-env-file)
             shift && get_compose_opts "$@"
+            determine_all_vars
             copy_env_to_container
             ;;
         upgrade-me)
@@ -149,8 +150,8 @@ main() {
     if [[ "$SAVE_STICKY_VARS" == "true" && $RETVAL -eq 0 ]]; then
         save_sticky_vars
         if [ $? -ne 0 ]; then
-            echo "WARNING: env file was not saved. Check:"
-            echo "    $STICKY_ENV_FILE"
+            echo "WARNING: settings file was not saved. Check:"
+            echo "    $STICKY_SETTINGS_FILE"
             echo "before trying again."
         fi
     fi
@@ -313,20 +314,24 @@ ohb_manager_version() {
 }
 
 get_sticky_vars() {
-    if [ -r $STICKY_ENV_FILE ]; then
-        source $STICKY_ENV_FILE
+    if [ -r $STICKY_SETTINGS_FILE ]; then
+        source $STICKY_SETTINGS_FILE
+    fi
+    # Migrate/alias legacy STICKY_LIGHTTPD_ENV_FILE if present
+    if [ -z "$STICKY_ENV_FILE" -a -n "$STICKY_LIGHTTPD_ENV_FILE" ]; then
+        STICKY_ENV_FILE="$STICKY_LIGHTTPD_ENV_FILE"
     fi
 }
 
 save_sticky_vars() {
     # Use a temporary file to make the write atomic and avoid 0-byte files on interruption.
     local TMP_STICKY
-    TMP_STICKY=$(mktemp "${STICKY_ENV_FILE}.XXXXXX") || return 1
+    TMP_STICKY=$(mktemp "${STICKY_SETTINGS_FILE}.XXXXXX") || return 1
 
     if cat<<EOF > "$TMP_STICKY"; then
 STICKY_HTTP_PORT="$HTTP_PORT"
 STICKY_HTTPS_PORT="$HTTPS_PORT"
-STICKY_LIGHTTPD_ENV_FILE="$ENV_FILE"
+STICKY_ENV_FILE="$ENV_FILE"
 STICKY_EXTERNAL_HTTP_LOG="$ENABLE_EXTERNAL_HTTP_LOG"
 STICKY_CERT_PATH="$CERT_PATH"
 STICKY_MAP_SIZES="$MAP_SIZES"
@@ -337,7 +342,7 @@ STICKY_PROXY_MAPS="$PROXY_MAPS"
 STICKY_HOST_HOSTNAME="$HOST_HOSTNAME"
 STICKY_SUBNET="$SUBNET"
 EOF
-        mv "$TMP_STICKY" "$STICKY_ENV_FILE"
+        mv "$TMP_STICKY" "$STICKY_SETTINGS_FILE"
     else
         echo "ERROR: Failed to write configuration to temporary file. Disk might be full." >&2
         rm -f "$TMP_STICKY"
@@ -488,6 +493,9 @@ is_ohb_installed() {
         echo "  Alpha install:         '$STICKY_ALPHA_INSTALL'"
         echo "  Proxy maps:            '$STICKY_PROXY_MAPS'"
         echo "  Service hostname:      '$STICKY_HOST_HOSTNAME'"
+        if [ -n "$STICKY_ENV_FILE" ]; then
+            echo "  ENV file:              '$STICKY_ENV_FILE'"
+        fi
         [ $STICKY_SUBNET == - ] && SUBNET_STATIC_MSG="dynamic" || SUBNET_STATIC_MSG="static"
         echo "  Docker subnet:         '$CURRENT_SUBNET' ($SUBNET_STATIC_MSG)"
     fi
@@ -508,6 +516,13 @@ upgrade_ohb() {
     echo "Upgrading OHB ..."
 
     REQUEST_DOCKER_PULL=true
+
+    # Remove only the web container so docker compose create can create the upgraded
+    # container for .env injection, while leaving auxiliary services running.
+    if is_container_exists; then
+        docker rm -f $CONTAINER >/dev/null 2>&1
+    fi
+
     echo "Starting the container ..."
     if docker_compose_up; then
         echo "Container started successfully."
@@ -569,7 +584,8 @@ docker_compose_up() {
         docker_compose_yml && docker compose -f <(echo "$DOCKER_COMPOSE_YML") create
         RETVAL=$?
         [ $RETVAL -ne 0 ] && return $RETVAL
-        if [ -n "$REQUESTED_ENV_FILE" -o -n "$STICKY_LIGHTTPD_ENV_FILE" -o -r "$DEFAULT_ENV_FILE" ]; then
+        determine_env_file
+        if [ -n "$ENV_FILE" -a -r "$ENV_FILE" ]; then
             copy_env_to_container >/dev/null
         fi
         docker compose -f <(echo "$DOCKER_COMPOSE_YML") up -d
@@ -651,16 +667,12 @@ recreate_ohb() {
 }
 
 copy_env_to_container() {
-    if [ -n "$REQUESTED_ENV_FILE" ]; then
-        if [[ "$REQUESTED_ENV_FILE" == /* ]]; then
-            ENV_FILE="$REQUESTED_ENV_FILE"
-        else
-            ENV_FILE="$STARTED_FROM/$REQUESTED_ENV_FILE"
-        fi
-    elif [ -n "$STICKY_LIGHTTPD_ENV_FILE" ]; then
-        ENV_FILE="$STICKY_LIGHTTPD_ENV_FILE"
-    else
-        ENV_FILE="$DEFAULT_ENV_FILE"
+    determine_env_file
+
+    if [ -z "$ENV_FILE" ]; then
+        echo "ERROR: No ENV file specified or found." >&2
+        RETVAL=1
+        return $RETVAL
     fi
 
     if is_container_exists; then
@@ -1068,7 +1080,7 @@ determine_tag() {
         return
     fi
 
-    # upgrade shouldn't use the current tag unless it's 'latest'. 
+    # upgrade shouldn't use the current tag unless it's 'edge'. 
     # GIT_TAG would be empty and we'll get DEFAULT_TAG
 
     # second precedence
@@ -1111,7 +1123,30 @@ determine_sysmsg_file() {
     fi
 }
 
-docker_compose_yml() {
+determine_env_file() {
+    # first precedence
+    if [ -n "$REQUESTED_ENV_FILE" ]; then
+        if [[ "$REQUESTED_ENV_FILE" == /* ]]; then
+            ENV_FILE="$REQUESTED_ENV_FILE"
+        else
+            ENV_FILE="$STARTED_FROM/$REQUESTED_ENV_FILE"
+        fi
+
+    # second precedence
+    elif [ -n "$STICKY_ENV_FILE" ]; then
+        ENV_FILE="$STICKY_ENV_FILE"
+
+    # third precedence
+    elif [ -r "$DEFAULT_ENV_FILE" ]; then
+        ENV_FILE="$DEFAULT_ENV_FILE"
+
+    # fourth precedence
+    else
+        ENV_FILE=""
+    fi
+}
+
+determine_all_vars() {
     determine_http_port
     determine_https_port
     determine_https_cert
@@ -1124,6 +1159,11 @@ docker_compose_yml() {
     determine_host_hostname
     determine_sysmsg_file
     determine_subnet
+    determine_env_file
+}
+
+docker_compose_yml() {
+    determine_all_vars
 
     determine_tag || return $?
     IMAGE=$IMAGE_BASE:$TAG
