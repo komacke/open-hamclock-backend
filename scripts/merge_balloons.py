@@ -55,16 +55,23 @@
 # ============================================================
 
 import argparse
+import logging
 import os
 import time
 
-from balloon_common import log, atomic_write_lines
+from balloon_common import atomic_write_lines
 
-CREDIT_LINE = "Credit: SondeHub + wsprlive"
-
-OUTDIR = "/opt/hamclock-backend/htdocs/ham/HamClock/balloons"   # adjust to your OHB webroot
-
+# ---- configuration -------------------------------------------------------
+CREDIT_LINE    = "Credit: SondeHub + wsprlive"
+OUTDIR         = "/opt/hamclock-backend/htdocs/ham/HamClock/balloons"   # adjust to your OHB webroot
 STALE_WARN_SEC = 30 * 60   # just a log hint, not enforced
+# --------------------------------------------------------------------------
+
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s %(levelname)s %(message)s'
+)
+log = logging.getLogger(__name__)
 
 
 def read_rows(path):
@@ -73,10 +80,10 @@ def read_rows(path):
             rows = [line.rstrip("\n") for line in f if line.strip()]
         age = time.time() - os.path.getmtime(path)
         if age > STALE_WARN_SEC:
-            log("MERGE", f"warning: {path} is {age/60:.0f} min old -- its fetcher may not be running")
+            log.warning(f"{path} is {age/60:.0f} min old -- its fetcher may not be running")
         return rows
     except FileNotFoundError:
-        log("MERGE", f"{path} not found yet -- treating as zero flights from that source")
+        log.info(f"{path} not found yet -- treating as zero flights from that source")
         return []
 
 
@@ -93,7 +100,7 @@ def main():
     lines = [CREDIT_LINE] + hab_rows + pico_rows
     outpath = os.path.join(args.dir, "balloons.txt")
     atomic_write_lines(outpath, lines)
-    log("MERGE", f"wrote {len(hab_rows)} HAB + {len(pico_rows)} PICO -> {outpath}")
+    log.info(f"Wrote {len(hab_rows)} HAB + {len(pico_rows)} PICO -> {outpath}")
 
 
 if __name__ == "__main__":

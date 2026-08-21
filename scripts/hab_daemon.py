@@ -37,6 +37,7 @@
 
 import argparse
 import json
+import logging
 import os
 import signal
 import sys
@@ -46,19 +47,30 @@ from datetime import datetime
 
 import sondehub
 
-from balloon_common import BalloonState, http_get, clean_field, log, atomic_write_lines
+from balloon_common import BalloonState, http_get, clean_field, atomic_write_lines
 
-HAB_URL_TMPL = "https://api.v2.sondehub.org/amateur?last={lookback}"
-HAB_TRACKER_URL = "https://amateur.sondehub.org/"
-
-CREDIT_LINE = "Credit:SondeHub+wsprlive"
-
-OUTDIR = "/opt/hamclock-backend/htdocs/ham/HamClock/balloons"   # adjust to your OHB webroot
+# ---- configuration -------------------------------------------------------
+OUTDIR                       = "/opt/hamclock-backend/htdocs/ham/HamClock/balloons"   # adjust to your OHB webroot
+LOG_FILE                     = "/opt/hamclock-backend/logs/hab.log"
+HAB_URL_TMPL                 = "https://api.v2.sondehub.org/amateur?last={lookback}"
+HAB_TRACKER_URL              = "https://amateur.sondehub.org/"
+CREDIT_LINE                  = "Credit:SondeHub+wsprlive"
 
 DEFAULT_BACKFILL_LOOKBACK_SEC = 4 * 3600
 DEFAULT_DROP_AGE_SEC          = 12 * 3600
 DEFAULT_FLUSH_INTERVAL_SEC    = 60
+DEFAULT_SILENCE_WARN_SEC      = 5 * 60    # log warning if no messages received for this long
 DEFAULT_STALE_AFTER_SEC       = 30 * 60   # no messages at all for this long -> assume wedged, exit
+# --------------------------------------------------------------------------
+
+os.makedirs(os.path.dirname(LOG_FILE), exist_ok=True)
+logging.basicConfig(
+    filename=LOG_FILE,
+    level=logging.INFO,
+    format='%(asctime)s %(levelname)s %(message)s'
+)
+log = logging.getLogger(__name__)
+
 
 def parse_iso8601_to_unix(s):
     if not s:
@@ -117,11 +129,13 @@ def record_from_amateur_msg(rec):
 
 class HabDaemon:
 
-    def __init__(self, outdir, drop_age_sec, flush_interval_sec, stale_after_sec, backfill_lookback_sec):
+    def __init__(self, outdir, drop_age_sec, flush_interval_sec, stale_after_sec,
+                 backfill_lookback_sec, silence_warn_sec=DEFAULT_SILENCE_WARN_SEC):
         self.outdir = outdir
         self.flush_interval_sec = flush_interval_sec
         self.stale_after_sec = stale_after_sec
         self.backfill_lookback_sec = backfill_lookback_sec
+        self.silence_warn_sec = silence_warn_sec
         self.state = BalloonState(os.path.join(outdir, "hab_state.json"), drop_age_sec)
         self.lock = threading.Lock()
         self.last_msg_t = time.time()          # seed so the watchdog doesn't fire immediately
@@ -130,7 +144,7 @@ class HabDaemon:
         self.stopping = threading.Event()
 
     def backfill(self):
-        log("HAB", f"startup backfill query ({self.backfill_lookback_sec}s)")
+        log.info(f"Startup backfill query ({self.backfill_lookback_sec}s)")
         try:
             raw = http_get(HAB_URL_TMPL.format(lookback=self.backfill_lookback_sec))
             data = json.loads(raw)
@@ -142,9 +156,9 @@ class HabDaemon:
                         key, fields, ts, lat, lon = got
                         self.state.update(key, fields, ts, lat, lon)
                         n += 1
-            log("HAB", f"backfill seeded {n} flights")
+            log.info(f"Backfill seeded {n} flights")
         except Exception as e:
-            log("HAB", f"backfill failed ({e}) -- continuing; live messages will populate state")
+            log.warning(f"Backfill failed ({e}) -- continuing; live messages will populate state")
 
     def on_message(self, msg):
         try:
@@ -159,13 +173,13 @@ class HabDaemon:
                         self.n_msgs_window += 1
             self.last_msg_t = time.time()
         except Exception as e:
-            log("HAB", f"error handling message: {e}")
+            log.error(f"Error handling message: {e}")
 
     def on_connect(self, mqttc, obj, flags, rc):
-        log("HAB", f"websocket connected (rc={rc})")
+        log.info(f"Connected to SondeHub amateur stream (rc={rc})")
 
     def on_disconnect(self, client, userdata, rc):
-        log("HAB", f"websocket disconnected (rc={rc}) -- sondehub.Stream will attempt to reconnect")
+        log.warning(f"Disconnected from SondeHub amateur stream (rc={rc}) -- sondehub.Stream will attempt to reconnect")
 
     def flush(self):
         with self.lock:
@@ -188,30 +202,43 @@ class HabDaemon:
             with open(pico_path, "r") as f:
                 pico_rows = [line.rstrip("\n") for line in f if line.strip()]
         except FileNotFoundError:
-            log("HAB", f"{pico_path} not found yet -- balloons.txt will have zero PICO rows for now")
+            log.info(f"{pico_path} not found yet -- balloons.txt will have zero PICO rows for now")
 
         balloons_path = os.path.join(self.outdir, "balloons.txt")
         atomic_write_lines(balloons_path, [CREDIT_LINE] + hab_rows + pico_rows)
 
-        log("HAB", f"flushed {len(hab_rows)} HAB ({msgs_this_interval} msgs in the last "
-                    f"{self.flush_interval_sec}s, {self.n_msgs_total} total since start) "
-                    f"+ {len(pico_rows)} PICO -> {balloons_path}")
+        silence = time.time() - self.last_msg_t
+        log.info(f"Cache: {len(hab_rows)} HAB buffered | +{msgs_this_interval} new/{self.flush_interval_sec}s | "
+                 f"{self.n_msgs_total} total since start | {len(pico_rows)} PICO merged -> {balloons_path}")
+
+        if silence > self.silence_warn_sec:
+            log.warning(
+                f"No messages received in {silence:.0f}s (> {self.silence_warn_sec}s) despite active "
+                f"connection -- check SondeHub amateur stream"
+            )
 
     def flush_loop(self):
         while not self.stopping.wait(self.flush_interval_sec):
-            self.flush()
+            try:
+                self.flush()
+            except Exception as e:
+                log.error(f"Flush error: {e}")
 
     def watchdog_loop(self):
         while not self.stopping.wait(30):
             idle = time.time() - self.last_msg_t
             if idle > self.stale_after_sec:
-                log("HAB", f"no messages received in {idle:.0f}s (> {self.stale_after_sec}s) -- "
-                            "assuming the connection is wedged; exiting so docker/run.sh's restart loop "
-                            "relaunches us (same philosophy as the blitzortung block above it)")
-                self.flush()
+                log.warning(f"No messages received in {idle:.0f}s (> {self.stale_after_sec}s) -- "
+                            "assuming connection is wedged; exiting so docker/run.sh's restart loop "
+                            "relaunches us (same philosophy as blitzortung)")
+                try:
+                    self.flush()
+                except Exception:
+                    pass
                 os._exit(1)                  # hard exit -- let the restart loop fully reinit the process
 
     def run(self):
+        log.info("HAB daemon starting (SondeHub amateur telemetry listener)")
         self.backfill()
         self.flush()                          # write hab.txt right away, don't wait a full flush interval
 
@@ -223,9 +250,12 @@ class HabDaemon:
                                   auto_start_loop=True)
 
         def handle_signal(signum, frame):
-            log("HAB", f"received signal {signum}, shutting down")
+            log.info(f"Received signal {signum}, shutting down")
             self.stopping.set()
-            self.flush()
+            try:
+                self.flush()
+            except Exception:
+                pass
             try:
                 stream.disconnect()
             except Exception:
@@ -235,7 +265,7 @@ class HabDaemon:
         signal.signal(signal.SIGTERM, handle_signal)
         signal.signal(signal.SIGINT, handle_signal)
 
-        log("HAB", "listening for live amateur telemetry...")
+        log.info("Listening for live amateur telemetry...")
         while not self.stopping.is_set():
             time.sleep(1)
 
@@ -248,6 +278,8 @@ def main():
                      help="drop a cached flight if its last report is older than this, seconds")
     ap.add_argument("--flush-interval", type=int, default=DEFAULT_FLUSH_INTERVAL_SEC,
                      help="how often to write hab.txt/save state, seconds")
+    ap.add_argument("--silence-warn", type=int, default=DEFAULT_SILENCE_WARN_SEC,
+                     help="log a warning if no message received in this many seconds")
     ap.add_argument("--stale-after", type=int, default=DEFAULT_STALE_AFTER_SEC,
                      help="exit if no message received at all in this many seconds")
     ap.add_argument("--backfill-lookback", type=int, default=DEFAULT_BACKFILL_LOOKBACK_SEC,
@@ -256,7 +288,7 @@ def main():
 
     os.makedirs(args.outdir, exist_ok=True)
     daemon = HabDaemon(args.outdir, args.drop_age, args.flush_interval,
-                        args.stale_after, args.backfill_lookback)
+                        args.stale_after, args.backfill_lookback, args.silence_warn)
     daemon.run()
 
 

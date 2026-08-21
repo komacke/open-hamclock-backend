@@ -54,17 +54,24 @@
 import argparse
 import csv
 import io
+import logging
 import os
 import time
 from datetime import datetime, timezone
 
-from balloon_common import BalloonState, http_get, clean_field, log, atomic_write_lines
+from balloon_common import BalloonState, http_get, clean_field, atomic_write_lines
 
-PICO_CSV_URL = "https://raw.githubusercontent.com/knormoyle/knormoyle.github.io/main/mymaps.csv"
-
-OUTDIR = "/opt/hamclock-backend/htdocs/ham/HamClock/balloons"
-
+# ---- configuration -------------------------------------------------------
+PICO_CSV_URL         = "https://raw.githubusercontent.com/knormoyle/knormoyle.github.io/main/mymaps.csv"
+OUTDIR               = "/opt/hamclock-backend/htdocs/ham/HamClock/balloons"
 DEFAULT_DROP_AGE_SEC = 4 * 86400   # mymaps.csv's own hysteresis is a couple days; give it margin
+# --------------------------------------------------------------------------
+
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s %(levelname)s %(message)s'
+)
+log = logging.getLogger(__name__)
 
 
 def parse_lastgood_to_unix(s):
@@ -89,7 +96,7 @@ def na_or_float(s):
 
 
 def fetch_and_update(state):
-    log("PICO", f"fetching {PICO_CSV_URL}")
+    log.info(f"Fetching {PICO_CSV_URL}")
     raw = http_get(PICO_CSV_URL).decode("utf-8", errors="replace")
     reader = csv.DictReader(io.StringIO(raw))
 
@@ -149,10 +156,10 @@ def fetch_and_update(state):
             state.update(key, fields, last_t, lat, lon)
             n_seen += 1
         except Exception as e:
-            log("PICO", f"skipping row {rec.get('flight')}: {e}")
+            log.warning(f"Skipping row {rec.get('flight')}: {e}")
             continue
 
-    log("PICO", f"{n_seen} flights in this fetch")
+    log.info(f"{n_seen} flights in this fetch")
 
 
 def main():
@@ -170,7 +177,7 @@ def main():
     try:
         fetch_and_update(state)
     except Exception as e:
-        log("PICO", f"fetch failed ({e}), writing out previously cached flights unchanged")
+        log.warning(f"Fetch failed ({e}), writing out previously cached flights unchanged")
 
     state.prune()
     state.save()
@@ -178,7 +185,7 @@ def main():
     rows = state.all_rows("PICO")
     outpath = os.path.join(args.outdir, "pico.txt")
     atomic_write_lines(outpath, rows)
-    log("PICO", f"wrote {len(rows)} flights -> {outpath}")
+    log.info(f"Wrote {len(rows)} flights -> {outpath}")
 
 
 if __name__ == "__main__":
