@@ -69,7 +69,7 @@ RUN cd /opt/hamclock-backend && \
 
 # Install hamclock-backend
 COPY --exclude=**/__pycache__/ --exclude=**/__init__.py --from=build-support /usr/local/lib/python3.13/dist-packages/ /usr/local/lib/python3.13/dist-packages/
-COPY --from=build-support /opt/pipx/sondehub/ /opt/pipx/sondehub/
+COPY --exclude=**/__pycache__/ --from=build-support /opt/pipx/sondehub/ /opt/pipx/sondehub/
 COPY --exclude=docker/ohb-maps.tar.zst . /opt/hamclock-backend/
 RUN cd /opt/hamclock-backend && \
     mv  docker/run.sh /opt && \
@@ -87,7 +87,7 @@ RUN cd /opt/hamclock-backend && \
     awk '/^[0-9\*]/ {full=$0; $1=$2=$3=$4=$5=""; sub(/^[ \t]+/, "", $0); exec=$0; sub(/[[:space:]]*[>|].*$/, "", exec); print "echo \"Running: " exec "\""; print $0; next} {print}' scripts/crontab | sed 's/[[:space:]]*2>&1//g' > prime_crontabs.sh && \
     # \
     # set permissions \
-    chown -R www-data:www-data . && \
+    chown -R www-data:www-data . /opt/pipx/sondehub && \
     chmod +x ham/HamClock/*.pl \
              scripts/* \
              prime_crontabs.sh \

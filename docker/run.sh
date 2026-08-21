@@ -118,7 +118,7 @@ echo "Starting cron ..."
 echo "Starting blitzortung ..."
 (
     while true; do
-        /opt/hamclock-backend/scripts/blitzortung_daemon.py
+        /usr/sbin/runuser -u www-data -- /opt/hamclock-backend/scripts/blitzortung_daemon.py
         echo "$(date -u +%H:%M:%S): Blitzortung stopped. Restarting in 5 seconds ..."
         sleep 5
     done
@@ -127,7 +127,7 @@ echo "Starting blitzortung ..."
 echo "Starting HAB ..."
 (
     while true; do
-        /opt/pipx/sondehub/venvs/sondehub/bin/python3 /opt/hamclock-backend/scripts/hab_daemon.py
+        /usr/sbin/runuser -u www-data -- /opt/pipx/sondehub/venvs/sondehub/bin/python3 /opt/hamclock-backend/scripts/hab_daemon.py
         echo "$(date -u +%H:%M:%S): HAB stopped. Restarting in 5 seconds ..."
         sleep 5
     done

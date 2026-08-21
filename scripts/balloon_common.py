@@ -94,15 +94,32 @@ def fmt_num(x, ndigits=None):
     return f"{x:.{ndigits}f}" if ndigits is not None else repr(x)
 
 
-def atomic_write_lines(path, lines):
-    """Write lines (no trailing newlines needed) to path, atomically (temp + rename)."""
+TMP_DIR = "/opt/hamclock-backend/htdocs/tmp"
+
+
+def write_lines(path, lines):
+    """Write lines directly to path (used for internal cache files) with 0644 permissions."""
     d = os.path.dirname(path) or "."
     os.makedirs(d, exist_ok=True)
+    with open(path, "w") as f:
+        for line in lines:
+            f.write(line + "\n")
+    os.chmod(path, 0o644)
+
+
+def atomic_write_lines(path, lines):
+    """Write lines atomically via htdocs/tmp (used for web-served balloons.txt)."""
+    d = TMP_DIR if os.path.isdir(TMP_DIR) else (os.path.dirname(path) or ".")
+    os.makedirs(d, exist_ok=True)
+    os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
     fd, tmp = tempfile.mkstemp(dir=d, prefix=".balloons.", suffix=".tmp")
     try:
         with os.fdopen(fd, "w") as f:
             for line in lines:
                 f.write(line + "\n")
+            f.flush()
+            os.fsync(f.fileno())
+        os.chmod(tmp, 0o644)
         os.replace(tmp, path)
     except Exception:
         try:
@@ -173,10 +190,11 @@ class BalloonState:
         return "|".join(f"{lat:.5f}:{lon:.5f}" for _, lat, lon in older)
 
     def save(self):
-        tmp = self.path + ".tmp"
-        with open(tmp, "w") as f:
+        d = os.path.dirname(self.path) or "."
+        os.makedirs(d, exist_ok=True)
+        with open(self.path, "w") as f:
             json.dump(self.data, f)
-        os.replace(tmp, self.path)
+        os.chmod(self.path, 0o644)
 
     def all_rows(self, type_tag):
         """build one balloons.txt-format CSV row per cached entry."""
