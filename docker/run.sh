@@ -127,7 +127,7 @@ echo "Starting blitzortung ..."
 echo "Starting HAB ..."
 (
     while true; do
-        /opt/hamclock-backend/scripts/hab_daemon.py
+        /opt/pipx/sondehub/venvs/sondehub/bin/python3 /opt/hamclock-backend/scripts/hab_daemon.py
         echo "$(date -u +%H:%M:%S): HAB stopped. Restarting in 5 seconds ..."
         sleep 5
     done
