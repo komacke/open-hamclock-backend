@@ -120,6 +120,8 @@ LANG=C
 3,18,33,48 * * * * $SCRIPTS/cron-wrapper.sh $SCRIPTS/update_aurora_maps.sh
 0 2,8,14,20 * * *   $SCRIPTS/cron-wrapper.sh $SCRIPTS/update_wx_mb_maps.sh
 
+*/30 * * * *   $SCRIPTS/cron-wrapper.sh $VENV/bin/python3 $SCRIPTS/fetch_pico.py
+
 # tropical cyclone
 # Fetch HamClock tropical cyclone data every six hours.
 # Writes to: /opt/hamclock-backend/htdocs/ham/HamClock/storms/storms.txt
