@@ -124,6 +124,15 @@ echo "Starting blitzortung ..."
     done
 )&
 
+echo "Starting HAB ..."
+(
+    while true; do
+        /opt/hamclock-backend/scripts/hab_daemon.py
+        echo "$(date -u +%H:%M:%S): HAB stopped. Restarting in 5 seconds ..."
+        sleep 5
+    done
+)&
+
 echo "OHB is running and ready to use at: $(date -u +%H:%M:%S)"
 
 # this extra work causes the container to stop quickly. We need to 
