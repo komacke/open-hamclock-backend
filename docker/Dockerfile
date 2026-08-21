@@ -25,7 +25,8 @@ RUN apt update && \
     tar -x --zstd -f ohb-maps.tar.zst -C ohb-maps --strip-components=1 maps/ && \
     rm -Rf ohb-maps.tar.zst
 
-RUN pip install --break-system-packages global-land-mask global_land_mask
+RUN pip install --break-system-packages global-land-mask global_land_mask && \
+    PIPX_HOME=/opt/pipx/sondehub pipx install sondehub
 
 #######################################################
 # Build the real image
@@ -68,6 +69,7 @@ RUN cd /opt/hamclock-backend && \
 
 # Install hamclock-backend
 COPY --exclude=**/__pycache__/ --exclude=**/__init__.py --from=build-support /usr/local/lib/python3.13/dist-packages/ /usr/local/lib/python3.13/dist-packages/
+COPY --from=build-support /opt/pipx/sondehub/ /opt/pipx/sondehub/
 COPY --exclude=docker/ohb-maps.tar.zst . /opt/hamclock-backend/
 RUN cd /opt/hamclock-backend && \
     mv  docker/run.sh /opt && \
