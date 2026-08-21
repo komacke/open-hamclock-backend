@@ -82,6 +82,7 @@ def write_cache(name: str, lines: list[str], encoding: str | None = None) -> Non
             fh.flush()
             os.fsync(fh.fileno())
 
+        os.chmod(tmp_path, 0o644)
         os.replace(tmp_path, dest)  # atomic on Linux (same filesystem)
         log.info("[%s] Wrote %d lines to cache (%s)", name, len(lines), enc)
 

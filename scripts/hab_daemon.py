@@ -47,10 +47,11 @@ from datetime import datetime
 
 import sondehub
 
-from balloon_common import BalloonState, http_get, clean_field, atomic_write_lines
+from balloon_common import BalloonState, http_get, clean_field, atomic_write_lines, write_lines
 
 # ---- configuration -------------------------------------------------------
 OUTDIR                       = "/opt/hamclock-backend/htdocs/ham/HamClock/balloons"   # adjust to your OHB webroot
+CACHEDIR                     = "/opt/hamclock-backend/cache/balloons"
 LOG_FILE                     = "/opt/hamclock-backend/logs/hab.log"
 HAB_URL_TMPL                 = "https://api.v2.sondehub.org/amateur?last={lookback}"
 HAB_TRACKER_URL              = "https://amateur.sondehub.org/"
@@ -129,14 +130,15 @@ def record_from_amateur_msg(rec):
 
 class HabDaemon:
 
-    def __init__(self, outdir, drop_age_sec, flush_interval_sec, stale_after_sec,
+    def __init__(self, outdir, cachedir, drop_age_sec, flush_interval_sec, stale_after_sec,
                  backfill_lookback_sec, silence_warn_sec=DEFAULT_SILENCE_WARN_SEC):
         self.outdir = outdir
+        self.cachedir = cachedir
         self.flush_interval_sec = flush_interval_sec
         self.stale_after_sec = stale_after_sec
         self.backfill_lookback_sec = backfill_lookback_sec
         self.silence_warn_sec = silence_warn_sec
-        self.state = BalloonState(os.path.join(outdir, "hab_state.json"), drop_age_sec)
+        self.state = BalloonState(os.path.join(cachedir, "hab_state.json"), drop_age_sec)
         self.lock = threading.Lock()
         self.last_msg_t = time.time()          # seed so the watchdog doesn't fire immediately
         self.n_msgs_total = 0                  # lifetime count, resets only on process restart
@@ -191,13 +193,13 @@ class HabDaemon:
             # between reading and clearing it
             msgs_this_interval = self.n_msgs_window
             self.n_msgs_window = 0
-        hab_path = os.path.join(self.outdir, "hab.txt")
-        atomic_write_lines(hab_path, hab_rows)
+        hab_path = os.path.join(self.cachedir, "hab.txt")
+        write_lines(hab_path, hab_rows)
 
         # also write the final merged balloons.txt HamClock actually fetches, folding
         # in whatever fetch_pico.py's cron has most recently written to pico.txt.
         pico_rows = []
-        pico_path = os.path.join(self.outdir, "pico.txt")
+        pico_path = os.path.join(self.cachedir, "pico.txt")
         try:
             with open(pico_path, "r") as f:
                 pico_rows = [line.rstrip("\n") for line in f if line.strip()]
@@ -273,6 +275,8 @@ class HabDaemon:
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--outdir", default=OUTDIR,
+                     help="directory to write balloons.txt into")
+    ap.add_argument("--cachedir", default=CACHEDIR,
                      help="directory to write hab.txt and the state cache into")
     ap.add_argument("--drop-age", type=int, default=DEFAULT_DROP_AGE_SEC,
                      help="drop a cached flight if its last report is older than this, seconds")
@@ -287,7 +291,8 @@ def main():
     args = ap.parse_args()
 
     os.makedirs(args.outdir, exist_ok=True)
-    daemon = HabDaemon(args.outdir, args.drop_age, args.flush_interval,
+    os.makedirs(args.cachedir, exist_ok=True)
+    daemon = HabDaemon(args.outdir, args.cachedir, args.drop_age, args.flush_interval,
                         args.stale_after, args.backfill_lookback, args.silence_warn)
     daemon.run()
 

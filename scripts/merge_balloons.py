@@ -64,6 +64,7 @@ from balloon_common import atomic_write_lines
 # ---- configuration -------------------------------------------------------
 CREDIT_LINE    = "Credit: SondeHub + wsprlive"
 OUTDIR         = "/opt/hamclock-backend/htdocs/ham/HamClock/balloons"   # adjust to your OHB webroot
+CACHEDIR       = "/opt/hamclock-backend/cache/balloons"
 STALE_WARN_SEC = 30 * 60   # just a log hint, not enforced
 # --------------------------------------------------------------------------
 
@@ -90,15 +91,24 @@ def read_rows(path):
 def main():
     ap = argparse.ArgumentParser(description=__doc__,
                                   formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--dir", default=OUTDIR,
-                     help="directory containing hab.txt/pico.txt, and where balloons.txt is written")
+    ap.add_argument("--outdir", default=OUTDIR,
+                     help="directory where balloons.txt is written")
+    ap.add_argument("--cachedir", default=CACHEDIR,
+                     help="directory containing hab.txt and pico.txt")
+    ap.add_argument("--dir", default=None, help=argparse.SUPPRESS)
     args = ap.parse_args()
 
-    hab_rows = read_rows(os.path.join(args.dir, "hab.txt"))
-    pico_rows = read_rows(os.path.join(args.dir, "pico.txt"))
+    outdir = args.dir if args.dir is not None else args.outdir
+    cachedir = args.dir if args.dir is not None else args.cachedir
+
+    os.makedirs(outdir, exist_ok=True)
+    os.makedirs(cachedir, exist_ok=True)
+
+    hab_rows = read_rows(os.path.join(cachedir, "hab.txt"))
+    pico_rows = read_rows(os.path.join(cachedir, "pico.txt"))
 
     lines = [CREDIT_LINE] + hab_rows + pico_rows
-    outpath = os.path.join(args.dir, "balloons.txt")
+    outpath = os.path.join(outdir, "balloons.txt")
     atomic_write_lines(outpath, lines)
     log.info(f"Wrote {len(hab_rows)} HAB + {len(pico_rows)} PICO -> {outpath}")
 

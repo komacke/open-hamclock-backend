@@ -59,11 +59,11 @@ import os
 import time
 from datetime import datetime, timezone
 
-from balloon_common import BalloonState, http_get, clean_field, atomic_write_lines
+from balloon_common import BalloonState, http_get, clean_field, write_lines
 
 # ---- configuration -------------------------------------------------------
 PICO_CSV_URL         = "https://raw.githubusercontent.com/knormoyle/knormoyle.github.io/main/mymaps.csv"
-OUTDIR               = "/opt/hamclock-backend/htdocs/ham/HamClock/balloons"
+CACHEDIR             = "/opt/hamclock-backend/cache/balloons"
 DEFAULT_DROP_AGE_SEC = 4 * 86400   # mymaps.csv's own hysteresis is a couple days; give it margin
 # --------------------------------------------------------------------------
 
@@ -165,14 +165,17 @@ def fetch_and_update(state):
 def main():
     ap = argparse.ArgumentParser(description=__doc__,
                                   formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--outdir", default=OUTDIR,
+    ap.add_argument("--cachedir", default=CACHEDIR,
                      help="directory to write pico.txt and the state cache into")
+    ap.add_argument("--outdir", default=None,
+                     help="deprecated alias for --cachedir")
     ap.add_argument("--drop-age", type=int, default=DEFAULT_DROP_AGE_SEC,
                      help="drop a cached flight if its last report is older than this, seconds")
     args = ap.parse_args()
 
-    os.makedirs(args.outdir, exist_ok=True)
-    state = BalloonState(os.path.join(args.outdir, "pico_state.json"), args.drop_age)
+    cachedir = args.outdir if args.outdir is not None else args.cachedir
+    os.makedirs(cachedir, exist_ok=True)
+    state = BalloonState(os.path.join(cachedir, "pico_state.json"), args.drop_age)
 
     try:
         fetch_and_update(state)
@@ -183,8 +186,8 @@ def main():
     state.save()
 
     rows = state.all_rows("PICO")
-    outpath = os.path.join(args.outdir, "pico.txt")
-    atomic_write_lines(outpath, rows)
+    outpath = os.path.join(cachedir, "pico.txt")
+    write_lines(outpath, rows)
     log.info(f"Wrote {len(rows)} flights -> {outpath}")
 
 
