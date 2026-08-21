@@ -119,7 +119,7 @@ echo "Starting blitzortung ..."
 (
     while true; do
         /opt/hamclock-backend/scripts/blitzortung_daemon.py
-        echo "$(date -u +%H:%M:%S): Blizortung stopped. Restarting in 5 seconds ..."
+        echo "$(date -u +%H:%M:%S): Blitzortung stopped. Restarting in 5 seconds ..."
         sleep 5
     done
 )&
