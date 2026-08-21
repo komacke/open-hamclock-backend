@@ -63,8 +63,10 @@ THRESH_LAUNCHES="${THRESH_LAUNCHES:-1200 2400 3600}"
 THRESH_WX_MAP="${THRESH_WX_MAP:-3600 7200 14400}"
 THRESH_SOLAR_HISTORY="${THRESH_SOLAR_HISTORY:-2592000 5184000 7776000}" # 30d 60d 90d
 THRESH_IOTA="${THRESH_IOTA:-90000 108000 172800}" # 25h 30h 48h
+THRESH_BALLOONS="${THRESH_BALLOONS:-300 600 1800}" # 5m 10m 30m
+THRESH_PICO="${THRESH_PICO:-2700 5400 10800}"      # 45m 90m 3h
 THRESH_DEFAULT="${THRESH_DEFAULT:-3600 7200 14400}"
-IGNORE_FILES="${IGNORE_FILES:-"ONTA/spot.pl"}"
+IGNORE_FILES="${IGNORE_FILES:-"ONTA/spot.pl hab_state.json pico_state.json"}"
 
 if [ -r "$STATUS_SETTINGS_CONF" ]; then
     source "$STATUS_SETTINGS_CONF"
@@ -102,6 +104,7 @@ DATA_SUBDIRS=(
     ONTA
     activenets
     aurora
+    balloons
     contests
     cty
     drap
@@ -174,11 +177,16 @@ get_thresholds() {
             echo "$THRESH_IOTA"
             return
             ;;
+        pico.txt)
+            echo "$THRESH_PICO"
+            return
+            ;;
     esac
 
     # Per-category thresholds: echo "fresh_sec recent_sec aged_sec"
     case "$category" in
         Bz|ONTA|worldwx)                       echo "$THRESH_BZ_ONTA_WX" ;;
+        balloons)                              echo "$THRESH_BALLOONS"   ;;
         drap|solar-wind)                       echo "$THRESH_DRAP_WIND"  ;;
         xray)                                  echo "$THRESH_XRAY"       ;;
         proton)                                echo "$THRESH_PROTON"     ;;
@@ -187,7 +195,7 @@ get_thresholds() {
         ssn)                                   echo "$THRESH_SSN"        ;;
         esats)                                 echo "$THRESH_ESATS"      ;;
         launches)                              echo "$THRESH_LAUNCHES"   ;;
-        activenets)                            echo "$THRESH_ACTIVENETS"  ;;
+        activenets)                            echo "$THRESH_ACTIVENETS" ;;
         contests)                              echo "$THRESH_CONTESTS"   ;;
         cty|dxpeds)                            echo "$THRESH_CTY_DX"     ;;
         map)                                   echo "$THRESH_MAP"        ;;
