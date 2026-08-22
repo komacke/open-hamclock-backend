@@ -5,3 +5,5 @@
 **/.agent*
 **/.vscode*
 /notes
+docker/msg
+docker/logs
