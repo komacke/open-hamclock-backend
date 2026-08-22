@@ -1,9 +1,10 @@
 # .gitignore
 # don't include these files in the git repo
 *.env
-sysmsg.txt
 ohb-maps.tar.zst
 notes/
 .vscode/
 .agent/
 .venv/
+docker/logs
+docker/msg

@@ -12,10 +12,12 @@ Installers are used to setup, configure and install OHB. We recommend the contai
 These are replaced dynamically in the background on the target host per the baselined [crontab](https://github.com/openhamclock/open-hamclock-backend/blob/main/scripts/crontab).
 
 - [x] [Bz/Bz.txt](https://github.com/openhamclock/open-hamclock-backend/blob/main/scripts/bz_simple.py) - Bz pane
-- [x] [aurora/aurora.txt](https://github.com/openhamclock/open-hamclock-backend/blob/main/scripts/gen_aurora.sh) - Aurora pane
+- [x] [aurora/aurora.txt](https://github.com/openhamclock/open-hamclock-backend/blob/main/scripts/gen_aurora.py) - Aurora pane
 - [x] [xray/xray.txt](https://github.com/openhamclock/open-hamclock-backend/blob/main/scripts/xray_simple.py) - GOES 16 X-Ray pane
-- [x] [worldwx/wx.txt](https://github.com/openhamclock/open-hamclock-backend/blob/main/scripts/update_world_wx.pl) - weather display on map hover
+- [x] [proton/protons.txt](https://github.com/openhamclock/open-hamclock-backend/blob/main/scripts/fetch_proton.py) - GOES Solar Proton Flux pane
+- [x] [worldwx/wx.txt](https://github.com/openhamclock/open-hamclock-backend/blob/main/scripts/update_world_wx.py) - weather display on map hover
 - [x] [esats/esats.txt](https://github.com/openhamclock/open-hamclock-backend/blob/main/scripts/fetch_tle.sh) - supports satellite list under DX
+- [x] [esats/esats-freq.txt](https://github.com/openhamclock/open-hamclock-backend/blob/main/scripts/fetch_sat_freq.sh) - SatNOGS satellite transmitter frequencies
 - [x] [solarflux/solarflux-history.txt](https://github.com/openhamclock/open-hamclock-backend/blob/main/scripts/gen_solarflux-history.sh) - supports solar flux history display when clicking solar flux pane
 - [x] [ssn/ssn-history.txt](https://github.com/openhamclock/open-hamclock-backend/blob/main/scripts/gen_ssn_history.pl) - supports sun spot number history display when clicking sun spot number pane 
 - [x] [solar-flux/solarflux-99.txt](https://github.com/openhamclock/open-hamclock-backend/blob/main/scripts/flux_simple.py) - supports solar flux pane
@@ -25,9 +27,18 @@ These are replaced dynamically in the background on the target host per the base
 - [x] [solar-wind/swind-24hr.txt](https://github.com/openhamclock/open-hamclock-backend/blob/main/scripts/swind_simple.py) - supports solar wind pane
 - [x] [ssn/ssn-31.txt](https://github.com/openhamclock/open-hamclock-backend/blob/main/scripts/ssn_simple.py) - supports (smoothed) sunspot number pane
 - [x] [ONTA/onta.txt](https://github.com/openhamclock/open-hamclock-backend/blob/main/scripts/gen_onta.pl) - generates OTA spots (POTA, SOTA, WWFF) on schedule per crontab
+- [x] [ONTA/iota_spots.txt](https://github.com/openhamclock/open-hamclock-backend/blob/main/scripts/gen_iota.pl) - generates IOTA spots on schedule per crontab
+- [x] [ONTA/xonta_spots.txt](https://github.com/openhamclock/open-hamclock-backend/blob/main/scripts/gen_xonta.pl) - generates extra xOTA spots (GMA, LLOTA) on schedule per crontab
+- [x] [ONTA/iota.txt](https://github.com/openhamclock/open-hamclock-backend/blob/main/scripts/fetch_IOTA.py) - supports IOTA islands reference cache
+- [x] [ONTA/wwff_spots.json](https://github.com/openhamclock/open-hamclock-backend/blob/main/scripts/fetch_wwff_cache.pl) - central WWFF spot cache for ONTA
 - [x] [contests/contests311.txt](https://github.com/openhamclock/open-hamclock-backend/blob/main/scripts/gen_contest-calendar.sh) - generates list of recent contests for contests pane
 - [x] [dxpeds/dxpeditions.txt](https://github.com/openhamclock/open-hamclock-backend/blob/main/scripts/gen_dxpeditions_spots.py) - generates list of dxpeds for dxpeds pane
-- [x] [NOAASpaceWX/noaaswx.txt](https://github.com/openhamclock/open-hamclock-backend/blob/main/scripts/gen_noaaswx.sh) - generates NOAA Space Wx metrics for NOAA Space Wx pane
+- [x] [launches/launches.txt](https://github.com/openhamclock/open-hamclock-backend/blob/main/scripts/fetch_launches.py) - generates upcoming space launches for launches pane
+- [x] [activenets/activenets.txt](https://github.com/openhamclock/open-hamclock-backend/blob/main/scripts/poll_activenets.py) - generates active nets list for active nets pane
+- [x] [hamqsl/hamqsl-cond.csv](https://github.com/openhamclock/open-hamclock-backend/blob/main/scripts/fetch_hamqsl.py) - generates HamQSL solar and band conditions for HF/VHF conditions pane
+- [x] [storms/storms.txt](https://github.com/openhamclock/open-hamclock-backend/blob/main/scripts/fetch_cyclones.py) - generates tropical cyclone data for storms tracking pane
+- [x] [balloons/balloons.txt](https://github.com/openhamclock/open-hamclock-backend/blob/main/scripts/fetch_pico.py) - generates HAB and Pico balloon tracking data for balloons pane
+- [x] [NOAASpaceWX/noaaswx.txt](https://github.com/openhamclock/open-hamclock-backend/blob/main/scripts/fetch_noaaswx.py) - generates NOAA Space Wx metrics for NOAA Space Wx pane
 - [x] [cty/cty_wt_mod-ll-dxcc.txt](https://github.com/openhamclock/open-hamclock-backend/blob/main/scripts/gen_cty_wt_mod.sh) - used to correlate spots for DXCC
       
 ### Dynamic Map Files
@@ -42,6 +53,7 @@ These are replaced dynamically in the background on the target host per the base
 - [x] [maps/Aurora](https://github.com/openhamclock/open-hamclock-backend/blob/main/scripts/update_aurora_maps.sh) - Aurora map display
 - [x] [maps/DRAP*](https://github.com/openhamclock/open-hamclock-backend/blob/main/scripts/update_drap_maps.sh) - DRAP map display
 - [x] [maps/MUF-RT*](https://github.com/openhamclock/open-hamclock-backend/blob/main/scripts/kc2g_muf_heatmap.sh) - MUF RT display based on kc2g propagation map engine
+- [x] [maps/Tropo*](https://github.com/openhamclock/open-hamclock-backend/blob/main/scripts/update_tropo_maps.sh) - Tropospheric ducting forecast maps
 - [x] maps/Terrain* - copied from CSI and hosted locally; no need to regenerate; Terrain map display
 - [x] [SDO/*](https://github.com/openhamclock/open-hamclock-backend/blob/main/scripts/update_all_sdo.sh) - images of the Sun for the SDO pane
 
@@ -59,6 +71,7 @@ These are endpoints that dynamically return data based on query parameters to th
 - [x] [ham/HamClock/fetchPSKReporter.pl](https://github.com/openhamclock/open-hamclock-backend/blob/main/ham/HamClock/fetchPSKReporter.pl) 
 - [x] [ham/HamClock/fetchWSPR.pl](https://github.com/openhamclock/open-hamclock-backend/blob/main/ham/HamClock/fetchWSPR.pl)
 - [x] [ham/HamClock/fetchRBN.pl](https://github.com/openhamclock/open-hamclock-backend/blob/main/ham/HamClock/fetchRBN.pl)
+- [x] [ham/HamClock/lightning/strikes.pl](https://github.com/openhamclock/open-hamclock-backend/blob/main/scripts/blitzortung_daemon.py) - live Blitzortung lightning strikes
 
 ### Static Files
 These files never change or are unlikely to need change any time soon.
@@ -98,4 +111,12 @@ ESP8266-based devices use an older API (some URLs are different) and need a bina
 - [x] VOACAP DE DX (uses new docker container)
 - [x] VOACAP MUF MAP (REL/TOA) (uses new docker container)
 - [x] RBN request and display
+- [x] GOES Solar Proton Flux generation, pull and display
+- [x] Space Launches generation, pull and display
+- [x] Active Nets generation, pull and display
+- [x] HamQSL HF/VHF Conditions generation, pull and display
+- [x] Tropical Cyclones/Storms generation, pull and display
+- [x] HAB & Pico Balloons generation, pull and display
+- [x] Tropospheric Ducting maps generation, download and display (all sizes)
+- [x] Blitzortung live lightning strikes request and display
 
