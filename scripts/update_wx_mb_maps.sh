@@ -52,6 +52,7 @@ need() { command -v "$1" >/dev/null 2>&1 || { echo "ERROR: missing $1" >&2; exit
 need curl
 need gmt
 need convert
+need gs
 
 [[ -x "$PYTHON_BIN" ]] || { echo "ERROR: missing executable $PYTHON_BIN" >&2; exit 1; }
 [[ -f "$RENDER_PY" ]]  || { echo "ERROR: missing $RENDER_PY" >&2; exit 1; }
@@ -191,9 +192,11 @@ make_wx_line_overlay_png() {
             -W0.6p,black -N1/0.45p,black -A10000 \
             -P -K > "$ps" && \
         gmt psxy -R -J -T -O >> "$ps" && \
-        GMT_USERDIR="$gmt_conf_dir" \
-        gmt psconvert "$ps" -Tg -E72 -A -F"$stem_base"
-    ) || { echo "gmt failed for Wx line overlay ${W}x${H}" >&2; return 1; }
+        gs -dBATCH -dNOPAUSE -dSAFER -dQUIET \
+            -sDEVICE=png16m -r72 \
+            -dDEVICEWIDTHPOINTS="${W}" -dDEVICEHEIGHTPOINTS="${H}" \
+            -sOutputFile="$png" "$ps"
+    ) || { echo "gmt/gs failed for Wx line overlay ${W}x${H}" >&2; return 1; }
 
     [[ -f "$png" ]] || {
         echo "line overlay PNG not found: $png" >&2
