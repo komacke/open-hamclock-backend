@@ -44,8 +44,5 @@ runuser_wrapper /opt/hamclock-backend/scripts/web15rss_fetch.py
 /bin/true # example
 
 # new scripts to prime
-runuser_wrapper /opt/hamclock-backend/scripts/gen_bandactivity.pl
-runuser_wrapper /opt/hamclock-backend/scripts/gen_xonta.pl
-runuser_wrapper /usr/bin/python3 /opt/hamclock-backend/scripts/fetch_pico.py
 
 #############################################
