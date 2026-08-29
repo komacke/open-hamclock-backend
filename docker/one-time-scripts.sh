@@ -43,4 +43,6 @@ runuser_wrapper /opt/hamclock-backend/scripts/web15rss_fetch.py
 #############################################
 /bin/true # example
 
+# new scripts to prime
+
 #############################################

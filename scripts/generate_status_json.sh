@@ -65,6 +65,7 @@ THRESH_SOLAR_HISTORY="${THRESH_SOLAR_HISTORY:-2592000 5184000 7776000}" # 30d 60
 THRESH_IOTA="${THRESH_IOTA:-90000 108000 172800}" # 25h 30h 48h
 THRESH_BALLOONS="${THRESH_BALLOONS:-300 600 1800}" # 5m 10m 30m
 THRESH_PICO="${THRESH_PICO:-2700 5400 10800}"      # 45m 90m 3h
+THRESH_BAND_ACTIVITY="${THRESH_BAND_ACTIVITY:-2100 3900 10800}" # 35m 65m 3h
 THRESH_DEFAULT="${THRESH_DEFAULT:-3600 7200 14400}"
 IGNORE_FILES="${IGNORE_FILES:-"ONTA/spot.pl hab_state.json pico_state.json"}"
 
@@ -179,6 +180,10 @@ get_thresholds() {
             ;;
         pico.txt)
             echo "$THRESH_PICO"
+            return
+            ;;
+        band_activity.txt)
+            echo "$THRESH_BAND_ACTIVITY"
             return
             ;;
     esac
@@ -1216,7 +1221,7 @@ $(build_dynamic_rows)
   <div class="section-header">
     <div class="section-icon"></div>
     <span class="section-title">Data Products ($DATA_TOTAL)</span>
-    <span class="section-path">${DATA_DIR}/{Bz,NOAASpaceWX,ONTA,activenets,aurora,contests,cty,drap,dst,dxpeds,esats,geomag,launches,proton,solar-flux,solar-wind,ssn,worldwx,xray}</span>
+    <span class="section-path">${DATA_DIR}/{Bz,NOAASpaceWX,ONTA,activenets,aurora,balloons,contests,cty,drap,dst,dxpeds,esats,geomag,launches,proton,solar-flux,solar-wind,ssn,worldwx,xray}</span>
   </div>
   <table>
     <thead>
