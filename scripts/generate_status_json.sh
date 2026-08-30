@@ -66,6 +66,11 @@ THRESH_IOTA="${THRESH_IOTA:-90000 108000 172800}" # 25h 30h 48h
 THRESH_BALLOONS="${THRESH_BALLOONS:-300 600 1800}" # 5m 10m 30m
 THRESH_PICO="${THRESH_PICO:-2700 5400 10800}"      # 45m 90m 3h
 THRESH_BAND_ACTIVITY="${THRESH_BAND_ACTIVITY:-2100 3900 10800}" # 35m 65m 3h
+THRESH_MARINE="${THRESH_MARINE:-300 600 1800}"        # 5m 10m 30m
+THRESH_FIREWX="${THRESH_FIREWX:-300 600 1800}"        # 5m 10m 30m
+THRESH_QUAKES="${THRESH_QUAKES:-2100 3900 10800}"     # 35m 65m 3h
+THRESH_HAMQSL="${THRESH_HAMQSL:-720 1800 3600}"       # 12m 30m 1h
+THRESH_STORMS="${THRESH_STORMS:-25200 43200 86400}"   # 7h 12h 24h
 THRESH_DEFAULT="${THRESH_DEFAULT:-3600 7200 14400}"
 IGNORE_FILES="${IGNORE_FILES:-"ONTA/spot.pl hab_state.json pico_state.json"}"
 
@@ -112,12 +117,17 @@ DATA_SUBDIRS=(
     dst
     dxpeds
     esats
+    firewx
     geomag
+    hamqsl
     launches
+    marine
     proton
+    quakes
     solar-flux
     solar-wind
     ssn
+    storms
     worldwx
     xray
 )
@@ -204,6 +214,11 @@ get_thresholds() {
         contests)                              echo "$THRESH_CONTESTS"   ;;
         cty|dxpeds)                            echo "$THRESH_CTY_DX"     ;;
         map)                                   echo "$THRESH_MAP"        ;;
+        marine)                                echo "$THRESH_MARINE"     ;;
+        firewx)                                echo "$THRESH_FIREWX"     ;;
+        quakes)                                echo "$THRESH_QUAKES"     ;;
+        hamqsl)                                echo "$THRESH_HAMQSL"     ;;
+        storms)                                echo "$THRESH_STORMS"     ;;
         *)                                     echo "$THRESH_DEFAULT"    ;;
     esac
 }
@@ -1221,7 +1236,7 @@ $(build_dynamic_rows)
   <div class="section-header">
     <div class="section-icon"></div>
     <span class="section-title">Data Products ($DATA_TOTAL)</span>
-    <span class="section-path">${DATA_DIR}/{Bz,NOAASpaceWX,ONTA,activenets,aurora,balloons,contests,cty,drap,dst,dxpeds,esats,geomag,launches,proton,solar-flux,solar-wind,ssn,worldwx,xray}</span>
+    <span class="section-path">${DATA_DIR}/{$(IFS=,; echo "${DATA_SUBDIRS[*]}")}</span>
   </div>
   <table>
     <thead>

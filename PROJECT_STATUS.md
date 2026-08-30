@@ -41,6 +41,9 @@ These are replaced dynamically in the background on the target host per the base
 - [x] [balloons/balloons.txt](https://github.com/openhamclock/open-hamclock-backend/blob/main/scripts/fetch_pico.py) - generates HAB and Pico balloon tracking data for balloons pane
 - [x] [NOAASpaceWX/noaaswx.txt](https://github.com/openhamclock/open-hamclock-backend/blob/main/scripts/fetch_noaaswx.py) - generates NOAA Space Wx metrics for NOAA Space Wx pane
 - [x] [cty/cty_wt_mod-ll-dxcc.txt](https://github.com/openhamclock/open-hamclock-backend/blob/main/scripts/gen_cty_wt_mod.sh) - used to correlate spots for DXCC
+- [x] [marine/warnings.txt](https://github.com/openhamclock/open-hamclock-backend/blob/main/scripts/fetch_marine_warnings.py) - generates active NWS marine warnings and statements
+- [x] [firewx/warnings.txt](https://github.com/openhamclock/open-hamclock-backend/blob/main/scripts/fetch_firewx_warnings.py) - generates active NWS fire weather warnings and watches (Red Flag)
+- [x] [quakes/quakes.txt](https://github.com/openhamclock/open-hamclock-backend/blob/main/scripts/fetch_quakes.py) - generates USGS M2.5+ earthquakes in past 24 hours
       
 ### Dynamic Map Files
 Note: Anything under maps/ is considered a "Core Map" in HamClock
@@ -120,4 +123,7 @@ ESP8266-based devices use an older API (some URLs are different) and need a bina
 - [x] HAB & Pico Balloons generation, pull and display
 - [x] Tropospheric Ducting maps generation, download and display (all sizes)
 - [x] Blitzortung live lightning strikes request and display
+- [x] Marine warnings generation, pull and display
+- [x] Fire weather warnings generation, pull and display
+- [x] Earthquakes generation, pull and display
 
