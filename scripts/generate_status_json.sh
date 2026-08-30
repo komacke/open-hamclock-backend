@@ -67,6 +67,7 @@ THRESH_BALLOONS="${THRESH_BALLOONS:-300 600 1800}" # 5m 10m 30m
 THRESH_PICO="${THRESH_PICO:-2700 5400 10800}"      # 45m 90m 3h
 THRESH_BAND_ACTIVITY="${THRESH_BAND_ACTIVITY:-2100 3900 10800}" # 35m 65m 3h
 THRESH_MARINE="${THRESH_MARINE:-300 600 1800}"        # 5m 10m 30m
+THRESH_FIRES="${THRESH_FIRES:-1200 2400 3600}"        # 20m 40m 1h
 THRESH_FIREWX="${THRESH_FIREWX:-300 600 1800}"        # 5m 10m 30m
 THRESH_QUAKES="${THRESH_QUAKES:-2100 3900 10800}"     # 35m 65m 3h
 THRESH_HAMQSL="${THRESH_HAMQSL:-720 1800 3600}"       # 12m 30m 1h
@@ -117,6 +118,7 @@ DATA_SUBDIRS=(
     dst
     dxpeds
     esats
+    fires
     firewx
     geomag
     hamqsl
@@ -215,6 +217,7 @@ get_thresholds() {
         cty|dxpeds)                            echo "$THRESH_CTY_DX"     ;;
         map)                                   echo "$THRESH_MAP"        ;;
         marine)                                echo "$THRESH_MARINE"     ;;
+        fires)                                 echo "$THRESH_FIRES"      ;;
         firewx)                                echo "$THRESH_FIREWX"     ;;
         quakes)                                echo "$THRESH_QUAKES"     ;;
         hamqsl)                                echo "$THRESH_HAMQSL"     ;;
