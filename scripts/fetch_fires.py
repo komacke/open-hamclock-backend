@@ -30,6 +30,19 @@ import urllib.request
 
 # Free key: https://firms.modaps.eosdis.nasa.gov/api/map_key/
 MAP_KEY = os.environ.get("FIRMS_MAP_KEY", "")
+if not MAP_KEY:
+    for env_path in ("/opt/hamclock-backend/.env", "docker/.env"):
+        if os.path.exists(env_path):
+            try:
+                with open(env_path) as f:
+                    for line in f:
+                        if line.startswith("FIRMS_MAP_KEY="):
+                            MAP_KEY = line.split("=", 1)[1].strip().strip('"').strip("'")
+                            break
+            except OSError:
+                pass
+        if MAP_KEY:
+            break
 
 # SNPP is being retired (Nov 2026) -- stick to the two current VIIRS platforms.
 # Add "MODIS_NRT" if you also want 1km MODIS coverage; MODIS uses a numeric
@@ -39,7 +52,9 @@ SOURCES = ["VIIRS_NOAA20_NRT", "VIIRS_NOAA21_NRT"]
 DAY_RANGE = 1                                   # most recent day only
 FETCH_INTERVAL_MIN = 15                         # for the cron/systemd timer, not enforced here
 
-CACHE_FILE = "/opt/hamclock-backend/htdocs/ham/HamClock/fires/hotspots.txt"
+HAMCLOCK_BASE = "/opt/hamclock-backend/htdocs/ham/HamClock"
+TMP_DIR = "/opt/hamclock-backend/htdocs/tmp"
+OUT_PATH = os.path.join(HAMCLOCK_BASE, "fires", "hotspots.txt")
 LOG_FILE = "/opt/hamclock-backend/logs/fetch_fires.log"
 
 # Threshold -- this is what keeps a world query from being 30k-100k+ points/day.
@@ -109,17 +124,21 @@ def fetch_all():
     return [(lat, lon, frp) for (lat, lon), frp in seen.items()]
 
 
-# ---- cache write (atomic) ----------------------------------------------------
+# ---- atomic write -----------------------------------------------------------
 
-def write_cache(hotspots):
-    d = os.path.dirname(CACHE_FILE)
-    os.makedirs(d, exist_ok=True)
-    fd, tmp_path = tempfile.mkstemp(dir=d, prefix=".fires_", suffix=".tmp")
+def atomic_write(target_path, content):
+    """Write content to a temporary file in TMP_DIR and atomically replace target_path."""
+    os.makedirs(TMP_DIR, exist_ok=True)
+    os.makedirs(os.path.dirname(target_path), exist_ok=True)
+    prefix = f".{os.path.basename(target_path)}."
+    fd, tmp_path = tempfile.mkstemp(dir=TMP_DIR, prefix=prefix, suffix=".tmp")
     try:
         with os.fdopen(fd, "w") as f:
-            for lat, lon, frp in hotspots:
-                f.write(f"{lat:.4f},{lon:.4f},{frp:.1f}\n")
-        os.replace(tmp_path, CACHE_FILE)        # atomic on POSIX -- readers never see a partial file
+            f.write(content)
+            f.flush()
+            os.fsync(f.fileno())
+        os.chmod(tmp_path, 0o644)
+        os.replace(tmp_path, target_path)
     except Exception:
         try:
             os.unlink(tmp_path)
@@ -140,8 +159,14 @@ def log(msg):
 
 
 def main():
+    if not MAP_KEY:
+        log("error: FIRMS_MAP_KEY not set")
+        sys.exit(1)
+
     hotspots = fetch_all()
-    write_cache(hotspots)
+    lines = [f"{lat:.4f},{lon:.4f},{frp:.1f}" for lat, lon, frp in hotspots]
+    summary_content = "\n".join(lines) + ("\n" if lines else "")
+    atomic_write(OUT_PATH, summary_content)
     log(f"wrote {len(hotspots)} hotspots from {SOURCES} (MIN_FRP_MW={MIN_FRP_MW})")
 
 
