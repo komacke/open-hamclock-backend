@@ -42,6 +42,7 @@ These are replaced dynamically in the background on the target host per the base
 - [x] [NOAASpaceWX/noaaswx.txt](https://github.com/openhamclock/open-hamclock-backend/blob/main/scripts/fetch_noaaswx.py) - generates NOAA Space Wx metrics for NOAA Space Wx pane
 - [x] [cty/cty_wt_mod-ll-dxcc.txt](https://github.com/openhamclock/open-hamclock-backend/blob/main/scripts/gen_cty_wt_mod.sh) - used to correlate spots for DXCC
 - [x] [marine/warnings.txt](https://github.com/openhamclock/open-hamclock-backend/blob/main/scripts/fetch_marine_warnings.py) - generates active NWS marine warnings and statements
+- [x] [fires/hotspots.txt](https://github.com/openhamclock/open-hamclock-backend/blob/main/scripts/fetch_fires.py) - generates active NASA FIRMS fire hotspots for fires overlay
 - [x] [firewx/warnings.txt](https://github.com/openhamclock/open-hamclock-backend/blob/main/scripts/fetch_firewx_warnings.py) - generates active NWS fire weather warnings and watches (Red Flag)
 - [x] [quakes/quakes.txt](https://github.com/openhamclock/open-hamclock-backend/blob/main/scripts/fetch_quakes.py) - generates USGS M2.5+ earthquakes in past 24 hours
       
