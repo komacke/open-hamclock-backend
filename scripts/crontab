@@ -133,4 +133,5 @@ LANG=C
 */5 * * * *    $SCRIPTS/cron-wrapper.sh $SCRIPTS/generate_status_json.sh
 */5 * * * *    $SCRIPTS/cron-wrapper.sh $VENV/bin/python3 $SCRIPTS/fetch_marine_warnings.py
 */5 * * * *    $SCRIPTS/cron-wrapper.sh $VENV/bin/python3 $SCRIPTS/fetch_firewx.py
+*/15 * * * *    $SCRIPTS/cron-wrapper.sh $VENV/bin/python3 $SCRIPTS/fetch_fires.py
 */30 * * * *    $SCRIPTS/cron-wrapper.sh $VENV/bin/python3 $SCRIPTS/fetch_quakes.py
