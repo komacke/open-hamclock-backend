@@ -10,6 +10,7 @@
 # and "runuser_wrapper" to call scripts as the container user and logging.
 #############################################
 THIS=$(basename $0)
+SCRIPTS=/opt/hamclock-backend/scripts
 
 # use cron wrapper for logging
 wrapper() {
@@ -18,7 +19,7 @@ wrapper() {
 }
 
 runuser_wrapper() {
-    WRAPPER=/opt/hamclock-backend/scripts/cron-wrapper.sh
+    WRAPPER=$SCRIPTS/cron-wrapper.sh
     export -f wrapper
     export THIS
     runuser -u www-data -- bash -c 'wrapper "$1" "${@:2}"' _ "$WRAPPER" "$@"
@@ -31,10 +32,10 @@ runuser_wrapper() {
 wrapper /etc/cron.daily/logrotate
 
 # reload fw files
-runuser_wrapper /opt/hamclock-backend/scripts/update_versions.pl
+runuser_wrapper $SCRIPTS/update_versions.pl
 
 # reload rss cache
-runuser_wrapper /opt/hamclock-backend/scripts/web15rss_fetch.py
+runuser_wrapper $SCRIPTS/web15rss_fetch.py
 
 #############################################
 
@@ -42,5 +43,10 @@ runuser_wrapper /opt/hamclock-backend/scripts/web15rss_fetch.py
 # things to run in this release
 #############################################
 /bin/true # example
+
+# new scripts to prime
+runuser_wrapper /usr/bin/python3 $SCRIPTS/fetch_marine_warnings.py
+runuser_wrapper /usr/bin/python3 $SCRIPTS/fetch_firewx_warnings.py
+runuser_wrapper /usr/bin/python3 $SCRIPTS/fetch_quakes.py
 
 #############################################

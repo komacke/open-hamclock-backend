@@ -885,7 +885,7 @@ determine_http_log() {
 
     if [ "$ENABLE_EXTERNAL_HTTP_LOG" == true ]; then
         EXTERNAL_HTTP_LOG_FOLDER="$HERE/logs/lighttpd"
-        EXTERNAL_HTTP_LOG_MAPPING="- $EXTERNAL_HTTP_LOG_FOLDER:/var/log/nginx:rw"
+        EXTERNAL_HTTP_LOG_MAPPING="- $EXTERNAL_HTTP_LOG_FOLDER:/var/log/nginx:rw,z"
         if [ "${FUNCNAME[2]}" == "docker_compose_up" ]; then
             if [ ! -e "$EXTERNAL_HTTP_LOG_FOLDER" ]; then
                 mkdir -p "$EXTERNAL_HTTP_LOG_FOLDER"
