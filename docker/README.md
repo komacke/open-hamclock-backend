@@ -21,7 +21,7 @@ We always recommend using one of the cloud-based backends. There is load created
 
 But if you want to run your own OHB (for example you are an early adopter and don't want to wait for the cloud-based backends to be deployed), then install your own OHB.
 
-Of course OHB can be deployed on a host OS. But there are many distributions out there and potentially the OHB dependencies can cause issues with your system. The generally accepted method of managing this is to run the service in a container.
+OHB is supported exclusively as a containerized deployment using the `manage-ohb-docker.sh` management script. This ensures all microservices (VOACAP, PSKReporter cache, WSPR live cache) and system dependencies run reliably without conflicting with your host distribution.
 
 You haven't used docker before? Now's your chance! It's not hard and it's great experience.
 
@@ -74,13 +74,12 @@ Find the tag you want from git:
 ```
 https://github.com/openhamclock/open-hamclock-backend/tags
 ```
-Navigate into the tag, download from ```Manage Docker Installs``` which will get you a file named: ```manage-ohb-docker-<version>.sh```. Rename it and make it executable. Using curl might work like this for v1.0:
-```
-curl -sLO https://github.com/openhamclock/open-hamclock-backend/releases/download/v1.0/manage-ohb-docker-v1.0.sh
-mv manage-ohb-docker-v1.0.sh manage-ohb-docker.sh 
+Navigate into the tag, download from ```Manage Docker Installs``` which will get you a file named: ```manage-ohb-docker-<version>.sh```. Using curl with `-o manage-ohb-docker.sh` saves it directly without needing to rename it:
+```bash
+curl -sL -o manage-ohb-docker.sh https://github.com/openhamclock/open-hamclock-backend/releases/download/v2.0.15/manage-ohb-docker-v2.0.15.sh
 chmod +x manage-ohb-docker.sh
 ```
-Plug in the version you downloaded for v1.0 in this example.
+Plug in the version you downloaded for v2.0.15 in this example.
 
 ### option 2: get the GitHub source tree
 The git clone command below should have the right URL but you can check it by visiting https://github.com/openhamclock/open-hamclock-backend, click on the green "Code" button and copy the https url.
@@ -192,11 +191,14 @@ Ok, so you have a back end. But does your hamclock know about it? Go to the proj
 
 
 # API Keys
-Two services require API keys: openweathermaps.com and ipgeolocation.io.
+OHB supports optional API keys for external services (see `.env.example`):
+- `OPEN_WEATHER_API_KEY`: for api.openweathermap.org (HamClock falls back to open-meteo.com if not provided)
+- `IPGEOLOC_API_KEY`: for app.ipgeolocation.io (initial location lookup for new HamClock setups)
+- `TIMEZONEDB_API_KEY`: for api.timezonedb.com (computes DST and timezone info)
+- `CQGMA_API_KEY`: for WWFF spots from cqgma.org
+- `FIRMS_MAP_KEY`: for NASA FIRMS active fire map resources
 
-If openweathermaps doesn't get a key, HamClock will fall back to open-meteo.com. If ipgeolocation.io doesn't have a key, installinga new HamCLock won't be able to pull up your location. Not the end of the world.
-
-If you have these keys, you can provide them to OHB by putting them into a file named ```.env``` and formatting the contents like this:
+If you have these keys, you can provide them to OHB by creating a file named `.env` in the directory where you run `manage-ohb-docker.sh`:
 ```
 # for the api.openweathermap.org API
 OPEN_WEATHER_API_KEY=<insert key here>
@@ -209,6 +211,9 @@ TIMEZONEDB_API_KEY=<insert key here>
 
 # for WWFF spots that are pulled from cqgma.org
 CQGMA_API_KEY=<insert key here>
+
+# for FIRMS fire resources
+FIRMS_MAP_KEY=<insert key here>
 ```
 Replace \<insert key here\> with your respective key.
 

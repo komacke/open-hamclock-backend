@@ -1,49 +1,52 @@
 ## 🚀 Quick Start
 
-Because of recent changes to depend on other docker containers, we recommend the docker install over the native OS install. We are considering a mixed install where the other supporting docker containers are containerized (requiring you run docker) and enable the OHB install to be on your native OS. Input on this appreciated.
+OHB is distributed and deployed as a Docker container. The only supported installation method is via Docker using the `manage-ohb-docker.sh` management script.
 
-### Install in a container with Docker
+### Install with Docker
+
 Download the manager utility that masks all the Docker details. Visit the releases page:
 
 👉 [Releases](https://github.com/openhamclock/open-hamclock-backend/releases/latest)
-and download the asset: **Manage Docker installs**.
+and download the asset: **Manage Docker installs** (`manage-ohb-docker-<version>.sh`), or download directly using curl:
 
-Make it executable:
-```
+```bash
+# Substitute the version you want (e.g., v2.0.15):
+curl -sL -o manage-ohb-docker.sh https://github.com/openhamclock/open-hamclock-backend/releases/download/v2.0.15/manage-ohb-docker-v2.0.15.sh
 chmod +x manage-ohb-docker.sh
 ```
 
-Run it. Substitute the version you want. This installs v0.16:
+Run the install command:
+```bash
+./manage-ohb-docker.sh install
 ```
-./manage-ohb-docker.sh install -t 0.16
+*(To install a specific version, pass `-t <version>`, e.g., `./manage-ohb-docker.sh install -t v2.0.15`)*.
+
+### Upgrading OHB
+
+Upgrading is a two-step process:
+
+1. First, upgrade the manager script itself:
+```bash
+./manage-ohb-docker.sh upgrade-me
 ```
 
-### Full Docker Install Instructions
-Full docker installation details:
-👉 [Detailed Installation Instructions](docker/README.md)
+2. Then, upgrade the OHB container:
+```bash
+./manage-ohb-docker.sh upgrade
+```
 
-### Install natively on your OS
-Clone and run the installer:
+### Verify Installation
+
+Verify the endpoint and core feeds:
 
 ```bash
-git clone https://github.com/openhamclock/open-hamclock-backend.git
-cd open-hamclock-backend
-sudo bash install_ohb.sh --size <desired size list>
-```
-Verify Core Feeds:
-
-```
-curl http://localhost/ham/HamClock/solarflux/solarflux-history.txt | tail
-curl http://localhost/ham/HamClock/geomag/kindex.txt | tail
+curl -s http://127.0.0.1/ham/HamClock/version.pl
+curl -s http://127.0.0.1/ham/HamClock/solarflux/solarflux-history.txt | tail
+curl -s http://127.0.0.1/ham/HamClock/geomag/kindex.txt | tail
 ```
 
-Verify Maps Exist:
-```
-sudo ls /opt/hamclock-backend/htdocs/ham/HamClock/maps | head
-```
+If you see data, OHB is running.
 
-If you see data and maps, OHB is running.
-
-### Full Native Install Instructions
-Full installation details:
-👉 [Detailed Installation Instructions](INSTALL.md)
+### Detailed Instructions
+- Full installation details: 👉 [Detailed Installation Instructions](INSTALL.md)
+- Docker guide & custom image builds: 👉 [Docker Guide](docker/README.md)
