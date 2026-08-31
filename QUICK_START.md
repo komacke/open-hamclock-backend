@@ -48,5 +48,5 @@ curl -s http://127.0.0.1/ham/HamClock/geomag/kindex.txt | tail
 If you see data, OHB is running.
 
 ### Detailed Instructions
-- Full installation details: 👉 [Detailed Installation Instructions](INSTALL.md)
-- Docker guide & custom image builds: 👉 [Docker Guide](docker/README.md)
+- Full installation & configuration guide: 👉 [Detailed Installation Instructions](INSTALL.md)
+- Custom image builds & release workflow: 👉 [Release Process Guide](RELEASE.md)

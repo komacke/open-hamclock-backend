@@ -15,17 +15,14 @@
   along with this program.  If not, see <https://www.gnu.org/licenses/>.
 -->
 
-## Install:
+## Overview
 
 OHB is distributed and deployed as a Docker container. The only supported installation method is via Docker using the `manage-ohb-docker.sh` management script. This ensures all dependencies and supporting microservices (VOACAP service, PSKReporter/MQTT cache, and WSPR live cache) are cleanly managed and isolated.
 
-(For additional Docker details, visit [the Docker README](docker/README.md))
+## Prerequisites
 
-## Installation:
-
-### Prerequisites
-- Docker and Docker Compose (v2+)
-- `jq` (command-line JSON processor)
+- **Docker and Docker Compose**: Ensure you have a recent version installed. In particular, Docker Compose must be v2+ (verified with `docker compose version`), rather than legacy 1.x (`docker-compose`).
+- **jq**: Command-line JSON processor used by the management script to query releases. Install via your package manager if not present (`apt install jq`, `dnf install jq`, etc.).
 
 Verify your prerequisites:
 ```bash
@@ -33,6 +30,8 @@ docker -v
 docker compose version
 jq --version
 ```
+
+## Installation
 
 ### Step 1: Download the Manager Script
 
@@ -74,6 +73,12 @@ To install a specific version tag instead of `edge` or latest, pass the `-t` opt
 When installation completes, OHB will be running. Verify the endpoint:
 ```bash
 curl -s http://127.0.0.1/ham/HamClock/version.pl
+```
+
+### Initial Data Seeding
+When started for the first time, OHB begins populating its cache and data feeds immediately. Nearly all current data will be ready within ~60 minutes, though historical graphs will accumulate over days. You can monitor the data seeding process in real time:
+```bash
+docker logs -f open-hamclock-backend
 ```
 
 ## Selecting map image sizes during install
@@ -174,3 +179,7 @@ Inject the keys into the running container and restart:
 ./manage-ohb-docker.sh add-env-file
 ./manage-ohb-docker.sh restart
 ```
+
+## Custom Image Builds
+
+To build your own Docker images locally (for testing or development) rather than pulling official images from Docker Hub, see [RELEASE.md](RELEASE.md).
