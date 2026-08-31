@@ -29,12 +29,16 @@ YELLOW=$(tput setaf 3)
 GREEN=$(tput setaf 2)
 NC=$(tput sgr0) # Reset color
 
-if ! TAG=$(git describe --exact-match --tags 2>/dev/null); then
-    echo "${RED}NOTE${NC}: Not currently on a tag. Using 'edge'."
-    TAG=edge
-    GIT_VERSION=$(git rev-parse HEAD 2>/dev/null || echo "unknown")
-else
+if [ -n "$TAG" ]; then
     GIT_VERSION=$TAG
+else
+    if ! TAG=$(git describe --exact-match --tags 2>/dev/null); then
+        echo "${RED}NOTE${NC}: Not currently on a tag. Using 'edge'."
+        TAG=edge
+        GIT_VERSION=$(git rev-parse HEAD 2>/dev/null || echo "unknown")
+    else
+        GIT_VERSION=$TAG
+    fi
 fi
 
 IMAGE=$IMAGE_BASE:$TAG
