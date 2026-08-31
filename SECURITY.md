@@ -8,7 +8,7 @@ This policy applies to the Open HamClock Backend (OHB) repository and all offici
 - Python and Perl CGI services  
 - Map generation scripts  
 - PSKReporter and NOAA ingestion services  
-- Optional AWS / EC2 installations  
+- Docker container deployments via manage-ohb-docker.sh  
 - VOACAP proxy and MUF endpoints  
 
 It does not cover third-party infrastructure, upstream NOAA feeds, PSKReporter systems, or unofficial forks.
