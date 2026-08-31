@@ -42,6 +42,8 @@ Discord is where we can collaborate, troubleshoot, and exchange ideas — no RF 
 
 ## 📦 Installation 👉 [Detailed installation instructions](INSTALL.md)
 
+## 🚢 Releases & Docker Builds 👉 [Release Process Guide](RELEASE.md)
+
 ## 📊 Project Completion Status
 
 👉 Full artifact tracking and integration status:

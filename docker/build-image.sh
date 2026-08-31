@@ -24,10 +24,10 @@ HTTP_PORT=80
 # Don't set anything past here
 
 # Define color variables
-RED=$(tput bold; tput setaf 1)
-YELLOW=$(tput setaf 3)
-GREEN=$(tput setaf 2)
-NC=$(tput sgr0) # Reset color
+RED=$(tput bold; tput setaf 1 2>/dev/null || true)
+YELLOW=$(tput setaf 3 2>/dev/null || true)
+GREEN=$(tput setaf 2 2>/dev/null || true)
+NC=$(tput sgr0 2>/dev/null || true) # Reset color
 
 if [ -n "$TAG" ]; then
     GIT_VERSION=$TAG
@@ -57,12 +57,17 @@ $THIS:
     if on a git tag and will use that for the docker image tag. Otherwise falls back
     to 'edge'.
 
-    -m: multi-platform image buld for: linux/amd64 linux/arm64 linux/arm/v7
-        - argument is ignored when run with -c
+    Options:
+    -m: multi-platform image build for: linux/amd64 linux/arm64
         - remember to setup a buildx container: 
             docker buildx create --name ohb --driver docker-container --use
             docker buildx inspect --bootstrap
     -n: add --no-cache to build
+    -h: show this help message
+
+    Environment variables:
+        TAG: override the image tag (default: git tag or 'edge')
+        FORCE=true: bypass local edits check
 EOF
     exit 0
 }
@@ -140,6 +145,10 @@ warn_local_edits() {
     LOCAL_EDITS=$?
 
     if [ $LOCAL_EDITS -ne 0 ]; then
+        if [ "$FORCE" == "true" ] || [ "$CI" == "true" ]; then
+            echo "${YELLOW}WARNING${NC}: Local edits detected, but proceeding because CI or FORCE is set."
+            return 0
+        fi
         if [ $MULTI_PLATFORM == true ]; then
             echo
             echo "${RED}ERROR${NC}: There are local edits. stash or reset them before pushing"
@@ -170,11 +179,13 @@ build_image() {
     echo
     echo "Building image for '$IMAGE_BASE:$TAG'"
     pushd "$HERE/.." >/dev/null
+
+    # only use latest on stable versions
+    if [[ $TAG =~ ^v[0-9]{1,2}\.[0-9]{1,2}\.[0-9]{1,2}$ ]]; then
+        TAG_LATEST="-t $IMAGE_BASE:latest"
+    fi
+
     if [ $MULTI_PLATFORM == true ]; then
-        # only use latest on stable versions
-        if [[ $TAG =~ ^v[0-9]{1,2}\.[0-9]{1,2}\.[0-9]{1,2}$ ]]; then
-            TAG_LATEST="-t $IMAGE_BASE:latest"
-        fi
         docker buildx build \
             $NOCACHE_ARG \
             --pull \
@@ -191,6 +202,7 @@ build_image() {
             --pull \
             --build-arg GIT_VERSION=${GIT_VERSION} \
             -t $IMAGE \
+            $TAG_LATEST \
             -f docker/Dockerfile \
             .
     fi

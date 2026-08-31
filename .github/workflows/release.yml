@@ -25,56 +25,60 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v5
+        with:
+          ref: ${{ github.ref_name }}
+          fetch-depth: 0
 
-      - name: Prepare assets
-        run: |
-          # Define asset names with the tag
-          TAG="${{ inputs.tag_name || github.ref_name }}"
-          REF="${{ github.ref_name }}"
-          MGR_NAME="manage-ohb-docker-$TAG.sh"
-          VERIFY_NAME="verify_firmware_integrity-$TAG.pl"
-
-          # create the distribution directory and clean up any old ones
-          mkdir dist
-
-          # create a manager with version in the name and file
-          sed "s/^\(OHB_MANAGER_VERSION=\).*$/\1$TAG/" ./docker/manage-ohb-docker.sh \
-          > "./docker/$MGR_NAME"
-
-          # create the integrity utility with version injected
-          sed "s/\(my \$VERSION = \)\"[^\"]*\"/\1\"$TAG\"/" \
-          ./scripts/utility/verify_firmware_integrity.pl \
-          > "./dist/$VERIFY_NAME"
-
-          # add version artifact
-          echo "TAG=$TAG" > VERSION.txt
-
-          # create the source bundles using git archive for a clean package
-          git archive --format=tar.gz --output="dist/OHB-$TAG.tar.gz" HEAD
-          git archive --format=zip --output="dist/OHB-$TAG.zip" HEAD
-
-          # Generate checksums for all assets
-          cd dist && sha256sum * > CHECKSUMS && cd ..
-
-      - name: Create Release and Upload Asset
+      - name: Create Release and Upload Assets
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           TAG="${{ inputs.tag_name || github.ref_name }}"
-          # Grabs file from repo tree and uploads with a label
-          gh release create "$TAG" \
-            "./docker/manage-ohb-docker-$TAG.sh#Manage OHB Docker Installs" \
-            "./dist/verify_firmware_integrity-$TAG.pl#Firmware Integrity Utility" \
-            "dist/OHB-$TAG.tar.gz#OHB Source Tarball" \
-            "dist/OHB-$TAG.zip#OHB Source Zip" \
-            "dist/CHECKSUMS#Asset Checksums" \
-            --title "OHB Release: $TAG" \
-            --generate-notes
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "Release $TAG already exists."
+          else
+            # Define asset names with the tag
+            MGR_NAME="manage-ohb-docker-$TAG.sh"
+            VERIFY_NAME="verify_firmware_integrity-$TAG.pl"
+
+            # create the distribution directory and clean up any old ones
+            mkdir -p dist
+
+            # create a manager with version in the name and file
+            sed "s/^\(OHB_MANAGER_VERSION=\).*$/\1$TAG/" ./docker/manage-ohb-docker.sh \
+            > "./docker/$MGR_NAME"
+
+            # create the integrity utility with version injected
+            sed "s/\(my \$VERSION = \)\"[^\"]*\"/\1\"$TAG\"/" \
+            ./scripts/utility/verify_firmware_integrity.pl \
+            > "./dist/$VERIFY_NAME"
+
+            # add version artifact
+            echo "TAG=$TAG" > VERSION.txt
+
+            # create the source bundles using git archive for a clean package
+            git archive --format=tar.gz --output="dist/OHB-$TAG.tar.gz" HEAD
+            git archive --format=zip --output="dist/OHB-$TAG.zip" HEAD
+
+            # Generate checksums for all assets
+            cd dist && sha256sum * > CHECKSUMS && cd ..
+
+            # Grabs file from repo tree and uploads with a label
+            gh release create "$TAG" \
+              "./docker/$MGR_NAME#Manage OHB Docker Installs" \
+              "./dist/$VERIFY_NAME#Firmware Integrity Utility" \
+              "dist/OHB-$TAG.tar.gz#OHB Source Tarball" \
+              "dist/OHB-$TAG.zip#OHB Source Zip" \
+              "dist/CHECKSUMS#Asset Checksums" \
+              --title "OHB Release: $TAG" \
+              --generate-notes
+          fi
 
   docker:
     name: Build and Push Docker Image
+    needs: release
     runs-on: ubuntu-latest
-    if: ${{ inputs.build_docker == true || inputs.build_docker == 'true' || inputs.build_docker == null }}
+    if: ${{ always() && (needs.release.result == 'success' || needs.release.result == 'skipped') && (inputs.build_docker == true || inputs.build_docker == 'true' || inputs.build_docker == null) }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v5
@@ -97,7 +101,6 @@ jobs:
       - name: Build and Push Multiplatform Image
         run: |
           TAG="${{ inputs.tag_name || github.ref_name }}"
-          git tag -f "$TAG"
           export TAG
           chmod +x docker/build-image.sh
           ./docker/build-image.sh -m
