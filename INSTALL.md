@@ -1,20 +1,3 @@
-<!--
-  Copyright (C) 2026 Open HamClock Backend (OHB) Contributors
-
-  This program is free software: you can redistribute it and/or modify
-  it under the terms of the GNU Affero General Public License as published by
-  the Free Software Foundation, either version 3 of the License, or
-  (at your option) any later version.
-
-  This program is distributed in the hope that it will be useful,
-  but WITHOUT ANY WARRANTY; without even the implied warranty of
-  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-  GNU Affero General Public License for more details.
-
-  You should have received a copy of the GNU Affero General Public License
-  along with this program.  If not, see <https://www.gnu.org/licenses/>.
--->
-
 ## Overview
 
 OHB is distributed and deployed as a Docker container. The only supported installation method is via Docker using the `manage-ohb-docker.sh` management script. This ensures all dependencies and supporting microservices (VOACAP service, PSKReporter/MQTT cache, and WSPR live cache) are cleanly managed and isolated.
@@ -183,3 +166,13 @@ Inject the keys into the running container and restart:
 ## Custom Image Builds
 
 To build your own Docker images locally (for testing or development) rather than pulling official images from Docker Hub, see [RELEASE.md](RELEASE.md).
+
+## License
+
+Copyright (C) 2026 Open HamClock Backend (OHB) Contributors
+
+This program is free software: you can redistribute it and/or modify it under the terms of the GNU Affero General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
+
+This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the [GNU Affero General Public License](LICENSE) for more details.
+
+You should have received a copy of the GNU Affero General Public License along with this program. If not, see <https://www.gnu.org/licenses/>.
