@@ -44,8 +44,8 @@ STATUS_SETTINGS_CONF="${SCRIPT_DIR}/status_settings.conf"
 # Provide default thresholds if the config file is missing or values are not set
 THRESH_BZ_ONTA_WX="${THRESH_BZ_ONTA_WX:-300 600 1800}"
 THRESH_DRAP_WIND="${THRESH_DRAP_WIND:-600 1200 3600}"
-THRESH_XRAY="${THRESH_XRAY:-300 600 1800}"
-THRESH_PROTON="${THRESH_PROTON:-300 600 1800}"
+THRESH_XRAY="${THRESH_XRAY:-360 720 3600}"
+THRESH_PROTON="${THRESH_PROTON:-360 720 3600}"
 THRESH_AURORA="${THRESH_AURORA:-1800 3600 7200}"
 THRESH_SDO_SPACE="${THRESH_SDO_SPACE:-3600 7200 14400}"
 THRESH_SSN="${THRESH_SSN:-7200 14400 28800}" # 2h 4h 8h
@@ -66,9 +66,9 @@ THRESH_IOTA="${THRESH_IOTA:-90000 108000 172800}" # 25h 30h 48h
 THRESH_BALLOONS="${THRESH_BALLOONS:-300 600 1800}" # 5m 10m 30m
 THRESH_PICO="${THRESH_PICO:-2700 5400 10800}"      # 45m 90m 3h
 THRESH_BAND_ACTIVITY="${THRESH_BAND_ACTIVITY:-2100 3900 10800}" # 35m 65m 3h
-THRESH_MARINE="${THRESH_MARINE:-300 600 1800}"        # 5m 10m 30m
+THRESH_MARINE="${THRESH_MARINE:-360 720 1800}"        # 6m 12m 30m
 THRESH_FIRES="${THRESH_FIRES:-1200 2400 3600}"        # 20m 40m 1h
-THRESH_FIREWX="${THRESH_FIREWX:-300 600 1800}"        # 5m 10m 30m
+THRESH_FIREWX="${THRESH_FIREWX:-360 720 1800}"        # 6m 12m 30m
 THRESH_QUAKES="${THRESH_QUAKES:-2100 3900 10800}"     # 35m 65m 3h
 THRESH_HAMQSL="${THRESH_HAMQSL:-720 1800 3600}"       # 12m 30m 1h
 THRESH_STORMS="${THRESH_STORMS:-25200 43200 86400}"   # 7h 12h 24h
@@ -81,17 +81,17 @@ else
     echo "WARNING: status_settings.conf not found or not readable. Using default thresholds." >&2
 fi
 
-DATA_DIR="/opt/hamclock-backend/htdocs/ham/HamClock"
-MAPS_DIR="/opt/hamclock-backend/htdocs/ham/HamClock/maps"
-SDO_DIR="/opt/hamclock-backend/htdocs/ham/HamClock/SDO"
-CACHE_DIR="/opt/hamclock-backend/cache"
+DATA_DIR="${DATA_DIR:-/opt/hamclock-backend/htdocs/ham/HamClock}"
+MAPS_DIR="${MAPS_DIR:-/opt/hamclock-backend/htdocs/ham/HamClock/maps}"
+SDO_DIR="${SDO_DIR:-/opt/hamclock-backend/htdocs/ham/HamClock/SDO}"
+CACHE_DIR="${CACHE_DIR:-/opt/hamclock-backend/cache}"
 
 # Determine the central mirror host
 MIRROR_HOST="${MIRROR:-ohb.hamclock.app}"
 
-OUTPUT="/opt/hamclock-backend/htdocs/ham/HamClock/status.html"
-OUTPUT_JSON="${OUTPUT%.html}.json"
-DYNAMIC_SIDECAR="/opt/hamclock-backend/htdocs/ham/HamClock/dynamic_status.json"
+OUTPUT="${OUTPUT:-/opt/hamclock-backend/htdocs/ham/HamClock/status.html}"
+OUTPUT_JSON="${OUTPUT_JSON:-${OUTPUT%.html}.json}"
+DYNAMIC_SIDECAR="${DYNAMIC_SIDECAR:-/opt/hamclock-backend/htdocs/ham/HamClock/dynamic_status.json}"
 NODE_EXPORTER_URL="${HAMCLOCK_NODE_EXPORTER_URL:-http://node-exporter:9100/metrics}"
 PROMETHEUS_URL="${HAMCLOCK_PROMETHEUS_URL:-http://prometheus:9090/api/v1/query}"
 QUERY_TIMEOUT="${HAMCLOCK_QUERY_TIMEOUT:-15}"
@@ -275,73 +275,6 @@ should_ignore() {
     return 1
 }
 
-calculate_stats() {
-    local dir="$1"
-    local label="$2"
-    local -n _f=$3; local -n _r=$4; local -n _a=$5; local -n _s=$6; local -n _st=$7; local -n _t=$8
-
-    # Special case: If we are proxying maps, local files don't matter/exist.
-    # We iterate the remote status entries instead.
-    if [[ "$label" == "map" && -n "$REMOTE_STATUS_HOST" ]]; then
-        if [ "$REMOTE_STATUS_SYNCED" -eq 1 ]; then
-            for rfname in "${!REMOTE_FILE_STATUS[@]}"; do
-                [[ "${REMOTE_FILE_CAT[$rfname]}" == "map" ]] || continue
-                should_ignore "$dir/$rfname" "$label" && continue
-                _t=$(( _t + 1 ))
-                case "${REMOTE_FILE_STATUS[$rfname]}" in
-                    FRESH)  _f=$(( _f + 1 )) ;;
-                    RECENT) _r=$(( _r + 1 )) ;;
-                    AGED)   _a=$(( _a + 1 )) ;;
-                    STALE)  _s=$(( _s + 1 )) ;;
-                    STATIC) _st=$(( _st + 1 )) ;;
-                esac
-            done
-        else
-            # Sync failed for proxied maps - report as stalled/error
-            _s=1; _t=1
-        fi
-        return
-    fi
-
-    [ ! -d "$dir" ] && return
-    while IFS= read -r -d '' filepath; do
-        local filename=$(basename "$filepath")
-        should_ignore "$filepath" "$label" && continue
-        _t=$(( _t + 1 ))
-
-        local status_text
-        local use_remote=0
-        if [[ "$label" == "map" && -n "$REMOTE_STATUS_HOST" ]]; then
-            use_remote=1
-        fi
-
-        if [ "$use_remote" -eq 1 ]; then
-            if [ "$REMOTE_STATUS_SYNCED" -eq 1 ]; then
-                status_text="${REMOTE_FILE_STATUS[$filename]:-STALE}"
-            else
-                status_text="SYNC_ERR"
-            fi
-        else
-            local mod_epoch=$(stat -c %Y "$filepath" 2>/dev/null || stat -f %m "$filepath" 2>/dev/null || echo 0)
-            local age_sec=$(( NOW_EPOCH - mod_epoch ))
-            age_sec=$(( age_sec < 0 ? 0 : age_sec ))
-            local thresholds
-            thresholds=$(get_thresholds "$label" "$filename")
-            local class_and_text
-            class_and_text=$(classify_age "$age_sec" "$thresholds")
-            status_text="${class_and_text#* }"
-        fi
-
-        case "$status_text" in
-            FRESH)  _f=$(( _f + 1 )) ;;
-            RECENT) _r=$(( _r + 1 )) ;;
-            AGED)   _a=$(( _a + 1 )) ;;
-            STALE|SYNC_ERR)  _s=$(( _s + 1 )) ;;
-            STATIC) _st=$(( _st + 1 )) ;;
-        esac
-    done < <(find "$dir" -maxdepth 1 -type f -print0 2>/dev/null)
-}
-
 # ─────────────────────────────────────────────────────────────────────────────
 
 NOW=$(date -u "+%Y-%m-%d %H:%M:%S")
@@ -487,12 +420,6 @@ else
     echo "WARNING: $DYNAMIC_SIDECAR not found or not readable. Treating as unavailable." >&2
 fi
 
-for subdir in "${DATA_SUBDIRS[@]}"; do
-    calculate_stats "${DATA_DIR}/${subdir}" "$subdir" DATA_FRESH DATA_RECENT DATA_AGED DATA_STALE DATA_STATIC DATA_TOTAL
-done
-calculate_stats "$SDO_DIR" "SDO" SDO_FRESH SDO_RECENT SDO_AGED SDO_STALE SDO_STATIC SDO_TOTAL
-calculate_stats "$MAPS_DIR" "map" MAP_FRESH MAP_RECENT MAP_AGED MAP_STALE MAP_STATIC MAP_TOTAL
-
 fmt_stat_summary() {
     local prefix=$1 f=$2 r=$3 a=$4 s=$5 st=$6
     [ "$f" -gt 0 ] && echo -n "<a href='#${prefix}-FRESH' class='badge-link'><span class='badge ok'>FRESH: $f</span></a> "
@@ -521,7 +448,7 @@ dyn_badge_class() { # This function is fine as is, it just maps states to CSS cl
     esac
 }
 
-# ── HTML row builder ─────────────────────────────────────────────────────────
+# ── HTML row builder & stat accumulator ──────────────────────────────────────
 # Args: $1=filepath  $2=category-label
 emit_file_row() {
     local filepath="$1"
@@ -535,10 +462,12 @@ emit_file_row() {
     local use_remote=0
     if [[ "$label" == "map" && -n "$REMOTE_STATUS_HOST" ]]; then
         use_remote=1
+    elif [[ "$filename" == "wwff_spots.json" && ! "$CQGMA_API_KEY" =~ ^GMA- && -n "${REMOTE_FILE_MOD[$filename]:-}" ]]; then
+        use_remote=1
     fi
 
     if [ "$use_remote" -eq 1 ]; then
-        if [ "$REMOTE_STATUS_SYNCED" -eq 1 ]; then
+        if [ "$REMOTE_STATUS_SYNCED" -eq 1 ] || [[ "$filename" == "wwff_spots.json" && -n "${REMOTE_FILE_MOD[$filename]:-}" ]]; then
             mod_human="${REMOTE_FILE_MOD[$filename]:-unknown}"
             mod_epoch=$(date -u -d "$mod_human" +%s 2>/dev/null || echo 0)
             age_sec=$(( NOW_EPOCH - mod_epoch ))
@@ -567,6 +496,53 @@ emit_file_row() {
         class_text=$(classify_age "$age_sec" "$(get_thresholds "$label" "$filename")")
         status_class="${class_text%% *}"
         status_text="${class_text#* }"
+    fi
+
+    # Update summary tallies in the current shell
+    case "$label" in
+        map)
+            MAP_TOTAL=$(( MAP_TOTAL + 1 ))
+            case "$status_text" in
+                FRESH)  MAP_FRESH=$(( MAP_FRESH + 1 )) ;;
+                RECENT) MAP_RECENT=$(( MAP_RECENT + 1 )) ;;
+                AGED)   MAP_AGED=$(( MAP_AGED + 1 )) ;;
+                STALE|SYNC_ERR) MAP_STALE=$(( MAP_STALE + 1 )) ;;
+                STATIC) MAP_STATIC=$(( MAP_STATIC + 1 )) ;;
+            esac
+            ;;
+        SDO)
+            SDO_TOTAL=$(( SDO_TOTAL + 1 ))
+            case "$status_text" in
+                FRESH)  SDO_FRESH=$(( SDO_FRESH + 1 )) ;;
+                RECENT) SDO_RECENT=$(( SDO_RECENT + 1 )) ;;
+                AGED)   SDO_AGED=$(( SDO_AGED + 1 )) ;;
+                STALE|SYNC_ERR) SDO_STALE=$(( SDO_STALE + 1 )) ;;
+                STATIC) SDO_STATIC=$(( SDO_STATIC + 1 )) ;;
+            esac
+            ;;
+        *)
+            DATA_TOTAL=$(( DATA_TOTAL + 1 ))
+            case "$status_text" in
+                FRESH)  DATA_FRESH=$(( DATA_FRESH + 1 )) ;;
+                RECENT) DATA_RECENT=$(( DATA_RECENT + 1 )) ;;
+                AGED)   DATA_AGED=$(( DATA_AGED + 1 )) ;;
+                STALE|SYNC_ERR) DATA_STALE=$(( DATA_STALE + 1 )) ;;
+                STATIC) DATA_STATIC=$(( DATA_STATIC + 1 )) ;;
+            esac
+            ;;
+    esac
+
+    # Stream JSON file entry into buffer file
+    if [ -n "${JSON_ENTRIES_FILE:-}" ] && [ -w "$JSON_ENTRIES_FILE" ]; then
+        local safe_name safe_label
+        safe_name=$(printf '%s' "$filename" | sed 's/\\/\\\\/g; s/"/\\"/g')
+        safe_label=$(printf '%s' "$label"   | sed 's/\\/\\\\/g; s/"/\\"/g')
+        if [ "$FIRST_JSON_ENTRY" -eq 0 ]; then
+            printf ',\n' >> "$JSON_ENTRIES_FILE"
+        fi
+        FIRST_JSON_ENTRY=0
+        printf '    {\n      "filename": "%s",\n      "category": "%s",\n      "modified_utc": "%s",\n      "age_seconds": %d,\n      "status": "%s"\n    }' \
+            "$safe_name" "$safe_label" "$mod_human" "$age_sec" "$status_text" >> "$JSON_ENTRIES_FILE"
     fi
 
     local id_attr=""
@@ -617,6 +593,7 @@ build_rows() {
             done
             return
         else
+            MAP_STALE=1; MAP_TOTAL=1
             echo "    <tr><td colspan='4' class='missing'>⚠ Proxy Sync failed with ${REMOTE_STATUS_HOST}</td></tr>"
             return
         fi
@@ -685,97 +662,28 @@ build_dynamic_rows() {
     '
 }
 
-# ── JSON builder ─────────────────────────────────────────────────────────────
-# Args: $1=directory  $2=category-label  $3=nameref to first-entry flag
-build_json_entries() {
-    local dir="$1"
-    local label="$2"
-    local -n _first_entry="$3"
+# ── Single-pass data product / map row rendering & stat accumulation ───────
+TMP_DIR="${TMP_DIR:-/opt/hamclock-backend/htdocs/tmp}"
+[ -d "$TMP_DIR" ] && [ -w "$TMP_DIR" ] || TMP_DIR="/tmp"
 
-    # Special handling for Maps Proxy in JSON
-    if [[ "$label" == "map" && -n "$REMOTE_STATUS_HOST" ]]; then
-        if [ "$REMOTE_STATUS_SYNCED" -eq 1 ]; then
-            for rfname in $(echo "${!REMOTE_FILE_STATUS[@]}" | tr ' ' '\n' | sort); do
-                [[ "${REMOTE_FILE_CAT[$rfname]}" == "map" ]] || continue
-                local filepath="$dir/$rfname"
-                should_ignore "$filepath" "$label" && continue
+DATA_ROWS_FILE=$(mktemp "$TMP_DIR/.status_data_XXXXXX.tmp")
+SDO_ROWS_FILE=$(mktemp "$TMP_DIR/.status_sdo_XXXXXX.tmp")
+MAP_ROWS_FILE=$(mktemp "$TMP_DIR/.status_map_XXXXXX.tmp")
+JSON_ENTRIES_FILE=$(mktemp "$TMP_DIR/.status_json_XXXXXX.tmp")
 
-                local mod_human="${REMOTE_FILE_MOD[$rfname]:-unknown}"
-                local mod_epoch=$(date -u -d "$mod_human" +%s 2>/dev/null || echo 0)
-                local age_sec=$(( NOW_EPOCH - mod_epoch ))
-                age_sec=$(( age_sec < 0 ? 0 : age_sec ))
-                local status_text="${REMOTE_FILE_STATUS[$rfname]:-STALE}"
-
-                local safe_name safe_label
-                safe_name=$(printf '%s' "$rfname" | sed 's/\\/\\\\/g; s/"/\\"/g')
-                safe_label=$(printf '%s' "$label"   | sed 's/\\/\\\\/g; s/"/\\"/g')
-
-                [ "$_first_entry" -eq 0 ] && printf ',\n'
-                _first_entry=0
-                printf '    {\n'
-                printf '      "filename": "%s",\n'      "$safe_name"
-                printf '      "category": "%s",\n'      "$safe_label"
-                printf '      "modified_utc": "%s",\n'  "$mod_human"
-                printf '      "age_seconds": %d,\n'     "$age_sec"
-                printf '      "status": "%s"\n'         "$status_text"
-                printf '    }'
-            done
-        fi
-        return
-    fi
-
-    [ ! -d "$dir" ] && return
-
-    while IFS= read -r -d '' filepath; do
-        local filename
-        filename=$(basename "$filepath")
-        should_ignore "$filepath" "$label" && continue
-
-        local mod_epoch mod_human age_sec status_text
-
-        local use_remote=0
-        if [[ "$label" == "map" && -n "${REMOTE_FILE_MOD[$filename]:-}" ]]; then
-            use_remote=1
-        elif [[ "$filename" == "wwff_spots.json" && ! "$CQGMA_API_KEY" =~ ^GMA- && -n "${REMOTE_FILE_MOD[$filename]:-}" ]]; then
-            use_remote=1
-        fi
-
-        if [ "$use_remote" -eq 1 ]; then
-            mod_human="${REMOTE_FILE_MOD[$filename]}"
-            mod_epoch=$(date -u -d "$mod_human" +%s 2>/dev/null || echo 0)
-            age_sec=$(( NOW_EPOCH - mod_epoch ))
-            age_sec=$(( age_sec < 0 ? 0 : age_sec ))
-            status_text="${REMOTE_FILE_STATUS[$filename]}"
-        else
-            mod_epoch=$(stat -c %Y "$filepath" 2>/dev/null || stat -f %m "$filepath" 2>/dev/null || echo 0)
-            mod_human=$(date -u -d "@$mod_epoch" "+%Y-%m-%d %H:%M:%S" 2>/dev/null \
-                     || date -u -r "$mod_epoch" "+%Y-%m-%d %H:%M:%S" 2>/dev/null)
-            age_sec=$(( NOW_EPOCH - mod_epoch ))
-            age_sec=$(( age_sec < 0 ? 0 : age_sec ))
-            local class_and_text
-            class_and_text=$(classify_age "$age_sec" "$(get_thresholds "$label" "$filename")")
-            status_text="${class_and_text#* }"
-        fi
-
-        local safe_name safe_label
-        safe_name=$(printf '%s' "$filename" | sed 's/\\/\\\\/g; s/"/\\"/g')
-        safe_label=$(printf '%s' "$label"   | sed 's/\\/\\\\/g; s/"/\\"/g')
-
-        [ "$_first_entry" -eq 0 ] && printf ',\n'
-        _first_entry=0
-        printf '    {\n'
-        printf '      "filename": "%s",\n'      "$safe_name"
-        printf '      "category": "%s",\n'      "$safe_label"
-        printf '      "modified_utc": "%s",\n'  "$mod_human"
-        printf '      "age_seconds": %d,\n'     "$age_sec"
-        printf '      "status": "%s"\n'         "$status_text"
-        printf '    }'
-    done < <(find "$dir" -maxdepth 1 -type f -print0 2>/dev/null | sort -z)
+cleanup() {
+    rm -f "$DATA_ROWS_FILE" "$SDO_ROWS_FILE" "$MAP_ROWS_FILE" "$JSON_ENTRIES_FILE"
 }
+trap cleanup EXIT
 
+FIRST_JSON_ENTRY=1
+
+build_data_rows > "$DATA_ROWS_FILE"
+build_rows "$SDO_DIR" "SDO" > "$SDO_ROWS_FILE"
+build_rows "$MAPS_DIR" "map" > "$MAP_ROWS_FILE"
+
+# ── JSON builder ─────────────────────────────────────────────────────────────
 build_json() {
-    local first_entry=1
-
     {
         printf '{\n'
         printf '  "generated_utc": "%s",\n'      "$NOW"
@@ -815,13 +723,7 @@ build_json() {
         fi
 
         printf '  "files": [\n'
-
-        for subdir in "${DATA_SUBDIRS[@]}"; do
-            build_json_entries "${DATA_DIR}/${subdir}" "$subdir" first_entry
-        done
-        build_json_entries "$SDO_DIR"  "SDO" first_entry
-        build_json_entries "$MAPS_DIR" "map" first_entry
-
+        [ -f "$JSON_ENTRIES_FILE" ] && cat "$JSON_ENTRIES_FILE"
         printf '\n  ]\n'
         printf '}\n'
     } > "$OUTPUT_JSON"
@@ -1253,7 +1155,7 @@ $(build_dynamic_rows)
     <tbody>
 HTML_HEAD
 
-build_data_rows
+cat "$DATA_ROWS_FILE"
 
 cat << HTML_SDO
     </tbody>
@@ -1279,7 +1181,7 @@ cat << HTML_SDO
     <tbody>
 HTML_SDO
 
-build_rows "$SDO_DIR" "SDO"
+cat "$SDO_ROWS_FILE"
 
 cat << HTML_MAPS
     </tbody>
@@ -1305,7 +1207,7 @@ cat << HTML_MAPS
     <tbody>
 HTML_MAPS
 
-build_rows "$MAPS_DIR" "map"
+cat "$MAP_ROWS_FILE"
 
 cat << HTML_FOOT
     </tbody>
