@@ -70,16 +70,12 @@ Most any version should be fine. If not installed, use your distribution's packa
 Either get the source tree from GitHub or download the manage-ohb-docker.sh script. Getting the source tree is only necessary if you plan to build your own custom image, which is covered down below.
 
 ### option 1: download the manager:
-Find the tag you want from git:
-```
-https://github.com/openhamclock/open-hamclock-backend/tags
-```
-Navigate into the tag, download from ```Manage Docker Installs``` which will get you a file named: ```manage-ohb-docker-<version>.sh```. Using curl with `-o manage-ohb-docker.sh` saves it directly without needing to rename it:
+You can query GitHub for the latest release tag and download the manager script in a single copy/paste block:
 ```bash
-curl -sL -o manage-ohb-docker.sh https://github.com/openhamclock/open-hamclock-backend/releases/download/v2.0.15/manage-ohb-docker-v2.0.15.sh
+TAG=$(curl -sL https://api.github.com/repos/openhamclock/open-hamclock-backend/releases/latest | jq -r .tag_name)
+curl -sL -o manage-ohb-docker.sh "https://github.com/openhamclock/open-hamclock-backend/releases/download/${TAG}/manage-ohb-docker-${TAG}.sh"
 chmod +x manage-ohb-docker.sh
 ```
-Plug in the version you downloaded for v2.0.15 in this example.
 
 ### option 2: get the GitHub source tree
 The git clone command below should have the right URL but you can check it by visiting https://github.com/openhamclock/open-hamclock-backend, click on the green "Code" button and copy the https url.
@@ -98,7 +94,7 @@ Ensure you are on the release you want to build. For example:
 ```
 git fetch
 git tag # lists the available tags
-git checkout v1.0
+git checkout v2.0.15
 ```
 
 ## Run the manager
@@ -151,36 +147,18 @@ The build-image.sh utility will create an image for you based on the git branch 
 # Upgrades
 Upgrading OHB is easy.
 
-## versions starting with v0.24
-If your manager utility version is 0.24 or later, it can upgrade itself.
-```
+Check your manager version:
+```bash
 ./manage-ohb-docker.sh version
 ```
 
-This is how to self-upgrade the utility:
-```
+First, self-upgrade the manager utility:
+```bash
 ./manage-ohb-docker.sh upgrade-me
 ```
 
 If it shows the latest version at the end, then use it to upgrade OHB:
-```
-./manage-ohb-docker.sh upgrade
-```
-
-## versions v0.23 and older
-Get the latest manager utility and run the manager utility with 'upgrade' command. Like install, it defaults to the current version, or falls back to 'edge'. If the default version isn't what you want, provide the -t option.
-```
-# Get the version you want. Let's assume it's version: <version>
-curl -sL -o manage-ohb-docker.sh https://github.com/openhamclock/open-hamclock-backend/releases/download/<version>/manage-ohb-docker-<version>.sh
-
-# Make it executable and double check:
-chmod +x manage-ohb-docker.sh
-./manage-ohb-docker.sh version
-
-# If you get an error, the file is probably corrupted. Confirm it's actually bash script:
-head manage-ohb-docker.sh
-
-# Run the upgrade command (you can use '-t <different version>' if you want)
+```bash
 ./manage-ohb-docker.sh upgrade
 ```
 

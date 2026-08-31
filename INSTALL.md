@@ -39,11 +39,11 @@ jq --version
 You can download the standalone manager script from GitHub Releases or from a repository clone:
 
 **Option A: Download standalone script**
-Find the release you want on the [Releases page](https://github.com/openhamclock/open-hamclock-backend/releases/latest) and download the asset named `manage-ohb-docker-<version>.sh`. If using curl, specify `-o manage-ohb-docker.sh`:
+Query GitHub for the latest release tag and download the manager script in a single copy/paste block:
 
 ```bash
-# Substitute the version you want (e.g., v2.0.15):
-curl -sL -o manage-ohb-docker.sh https://github.com/openhamclock/open-hamclock-backend/releases/download/v2.0.15/manage-ohb-docker-v2.0.15.sh
+TAG=$(curl -sL https://api.github.com/repos/openhamclock/open-hamclock-backend/releases/latest | jq -r .tag_name)
+curl -sL -o manage-ohb-docker.sh "https://github.com/openhamclock/open-hamclock-backend/releases/download/${TAG}/manage-ohb-docker-${TAG}.sh"
 chmod +x manage-ohb-docker.sh
 ```
 
