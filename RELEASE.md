@@ -72,9 +72,20 @@ gh workflow run release.yml -f tag_name=v2.0.16 -f draft=true
 # Optional: skip Docker Hub image build/push:
 gh workflow run release.yml -f tag_name=v2.0.16 -f build_docker=false
 
+# Optional: draft release without Docker build:
+gh workflow run release.yml -f tag_name=v2.0.16 -f draft=true -f build_docker=false
+
 # Interactive mode (prompts for inputs):
 gh workflow run
 ```
+
+#### Workflow Inputs (`workflow_dispatch`)
+
+| Input | Type | Default | Description |
+|---|---|---|---|
+| `tag_name` | string | `v0.0.0` | Version tag to release (e.g., `v2.0.16`). |
+| `draft` | boolean | `false` | When `true`, creates the GitHub Release as a draft. |
+| `build_docker` | boolean | `true` | When `true`, builds and pushes the multi-platform Docker image. |
 
 Alternatively, pushing a signed git tag matching `v*` will trigger the workflow automatically:
 
