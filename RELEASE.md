@@ -63,17 +63,17 @@ gh auth status
 Trigger the release workflow manually using `workflow_dispatch`:
 
 ```bash
-# Trigger release build for version v2.0.16:
+# Trigger release build for version v2.0.16 (builds Docker and publishes release by default):
 gh workflow run release.yml -f tag_name=v2.0.16
 
 # Optional: create as a draft release:
-gh workflow run release.yml -f tag_name=v2.0.16 -f draft=true
+gh workflow run release.yml -f tag_name=v2.0.16 -f publish_release=false
 
 # Optional: skip Docker Hub image build/push:
 gh workflow run release.yml -f tag_name=v2.0.16 -f build_docker=false
 
 # Optional: draft release without Docker build:
-gh workflow run release.yml -f tag_name=v2.0.16 -f draft=true -f build_docker=false
+gh workflow run release.yml -f tag_name=v2.0.16 -f publish_release=false -f build_docker=false
 
 # Interactive mode (prompts for inputs):
 gh workflow run
@@ -84,8 +84,8 @@ gh workflow run
 | Input | Type | Default | Description |
 |---|---|---|---|
 | `tag_name` | string | `v0.0.0` | Version tag to release (e.g., `v2.0.16`). |
-| `draft` | boolean | `false` | When `true`, creates the GitHub Release as a draft. |
-| `build_docker` | boolean | `true` | When `true`, builds and pushes the multi-platform Docker image. |
+| `publish_release` | choice (`true`, `false`) | `true` | When `true`, publishes the release immediately. Set to `false` to create as a draft. |
+| `build_docker` | choice (`true`, `false`) | `true` | When `true`, builds and pushes the multi-platform Docker image. |
 
 Alternatively, pushing a signed git tag matching `v*` will trigger the workflow automatically:
 

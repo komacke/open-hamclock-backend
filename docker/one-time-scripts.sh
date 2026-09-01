@@ -45,9 +45,5 @@ runuser_wrapper $SCRIPTS/web15rss_fetch.py
 /bin/true # example
 
 # new scripts to prime
-runuser_wrapper /usr/bin/python3 $SCRIPTS/fetch_marine_warnings.py
-runuser_wrapper /usr/bin/python3 $SCRIPTS/fetch_firewx_warnings.py
-runuser_wrapper /usr/bin/python3 $SCRIPTS/fetch_quakes.py
-runuser_wrapper /usr/bin/python3 $SCRIPTS/fetch_fires.py
 
 #############################################
