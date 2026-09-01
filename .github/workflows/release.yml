@@ -90,7 +90,7 @@ jobs:
     name: Build and Push Docker Image
     needs: release
     runs-on: ubuntu-latest
-    if: ${{ always() && (needs.release.result == 'success' || needs.release.result == 'skipped') && (inputs.build_docker == true || inputs.build_docker == 'true' || inputs.build_docker == null) }}
+    if: ${{ always() && (needs.release.result == 'success' || needs.release.result == 'skipped') && (github.event_name == 'push' || inputs.build_docker == true || inputs.build_docker == 'true') }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v5
