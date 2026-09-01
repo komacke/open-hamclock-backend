@@ -109,6 +109,12 @@ gh run list --workflow=release.yml -L 5
 gh run view <RUN_ID>
 gh run view <RUN_ID> --log
 gh run view <RUN_ID> --log-failed
+
+# Cancel a running workflow:
+gh run cancel <RUN_ID>
+
+# Force cancel if a run is unresponsive (e.g., during long-running Docker builds):
+gh run cancel <RUN_ID> --force
 ```
 
 ---
