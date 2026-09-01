@@ -10,16 +10,22 @@ on:
         description: 'Tag name (e.g., v0.0.1)'
         required: true
         default: 'v0.0.0'
-      draft:
-        description: 'Create as a draft release'
-        required: false
-        type: boolean
-        default: false
+      publish_release:
+        description: 'Publish GitHub release directly (set to false for draft)'
+        required: true
+        type: choice
+        options:
+          - 'true'
+          - 'false'
+        default: 'true'
       build_docker:
         description: 'Build and push Docker image'
-        required: false
-        type: boolean
-        default: true
+        required: true
+        type: choice
+        options:
+          - 'true'
+          - 'false'
+        default: 'true'
 
 jobs:
   release:
@@ -37,7 +43,7 @@ jobs:
       - name: Create Release and Upload Assets
         env:
           GH_TOKEN: ${{ github.token }}
-          IS_DRAFT: ${{ inputs.draft }}
+          PUBLISH_RELEASE: ${{ inputs.publish_release }}
         run: |
           TAG="${{ inputs.tag_name || github.ref_name }}"
           if gh release view "$TAG" >/dev/null 2>&1; then
@@ -70,7 +76,7 @@ jobs:
             cd dist && sha256sum * > CHECKSUMS && cd ..
 
             EXTRA_FLAGS=()
-            if [ "$IS_DRAFT" = "true" ]; then
+            if [ "$PUBLISH_RELEASE" = "false" ]; then
               EXTRA_FLAGS+=(--draft)
             fi
 
@@ -90,7 +96,7 @@ jobs:
     name: Build and Push Docker Image
     needs: release
     runs-on: ubuntu-latest
-    if: ${{ always() && (needs.release.result == 'success' || needs.release.result == 'skipped') && (github.event_name == 'push' || inputs.build_docker == true || inputs.build_docker == 'true') }}
+    if: ${{ needs.release.result == 'success' && (github.event_name == 'push' || inputs.build_docker == true || inputs.build_docker == 'true') }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v5
