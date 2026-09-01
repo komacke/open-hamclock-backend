@@ -66,6 +66,9 @@ Trigger the release workflow manually using `workflow_dispatch`:
 # Trigger release build for version v2.0.16:
 gh workflow run release.yml -f tag_name=v2.0.16
 
+# Optional: create as a draft release:
+gh workflow run release.yml -f tag_name=v2.0.16 -f draft=true
+
 # Optional: skip Docker Hub image build/push:
 gh workflow run release.yml -f tag_name=v2.0.16 -f build_docker=false
 
