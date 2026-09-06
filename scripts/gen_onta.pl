@@ -117,6 +117,21 @@ sub clean_field {
 }
 
 # ---------------------------------------------------------------------------
+# Sanitize a frequency field before numeric use. Upstream WWFF/GMA API has
+# been observed to prefix QRG values with stray junk, e.g. ":   5354.0" or
+# "p:  14308.", which numifies to 0 in Perl and silently fails the
+# "$freq > 0" sanity check further down -- discarding an otherwise valid
+# spot. Strip anything that isn't a digit, a decimal point, or a leading
+# minus sign, then let the caller re-validate the result.
+# ---------------------------------------------------------------------------
+sub clean_freq {
+    my ($v) = @_;
+    return '' unless defined $v;
+    $v =~ s/[^0-9.\-]//g;
+    return $v;
+}
+
+# ---------------------------------------------------------------------------
 # Load a reference lookup CSV into a hash keyed by reference string.
 # Required columns: reference, latitude, longitude, grid
 # Optional column (first match wins, case-sensitive to match each source's
@@ -436,6 +451,13 @@ sub resolve_state {
 # Fields: ACTIVATOR, QRG (MHz), MODE, REF, LAT, LON, DATE ("YYYYMMDD"),
 #         TIME ("HHMM" UTC)
 # Location is embedded in each spot — no cache lookup needed.
+#
+# NOTE: most genuine WWFF-network spots come through with MODE == "" --
+# only the small subset of GMA "self-spot" records happen to carry a mode
+# string. We no longer require a mode to be present (POTA/SOTA don't
+# either), and QRG is sanitized before numeric use since the upstream API
+# has been observed to prefix it with stray junk (e.g. ":  5354.0" or
+# "p:  14308.") that would otherwise numify to 0 and get silently dropped.
 # ---------------------------------------------------------------------------
 {
     my $body = fetch_source($WWFF_URL, $ua, 'WWFF');
@@ -452,9 +474,10 @@ sub resolve_state {
             next unless length $call;
             next if length($call) > $MAX_CALL;
 
-            my $freq = $s->{QRG}  // next;   # kHz
+            my $freq = clean_freq($s->{QRG});   # kHz, sanitized
             my $mode = uc(clean_field($s->{MODE}));
-            next unless length $mode;         # skip spots with no mode
+            # NOTE: intentionally NOT requiring a non-empty mode here --
+            # see comment above the WWFF block.
 
             my $park = clean_field($s->{REF}); next unless length $park;
             my $lat  = $s->{LAT}  // next;
