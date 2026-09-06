@@ -17,7 +17,7 @@
 #  https://github.com/openhamclock/open-hamclock-backend/tree/main
 #
 #  Sibling to gen_iota.pl -- same idea (query Spothole, since these programmes
-#  don't have their own dedicated per-programme scripts the way POTA/SOTA/WWFF
+#  don't have their own dedicated per-programme scripts the way POTA/WWFF
 #  do in gen_onta.pl), REWRITTEN after live testing against the public
 #  spothole.app API on 2026-08-19 showed the original per-SIG-filtered-request
 #  design (one ?sig=X call per programme) was unreliable in two different ways:
@@ -70,16 +70,74 @@
 #  maintainer whether the sig tag can be made reliable for GMA specifically)
 #  rather than treating this fallback as a long-term solution.
 #
-#  UNRESOLVED AS OF THIS VERSION:
-#   - "Towers" appeared as a live `source` in sampling but its meaning
-#     hasn't been identified yet -- deliberately left out of TARGET_ORGS
-#     until someone pulls a sample record and figures out what it is.
+#  2026-09-06 UPDATE -- SOTA, Towers (TOTA), and WWBOTA added:
+#   - SOTA: added because the dedicated SOTAwatch API (api2.sota.org.uk)
+#     that gen_onta.pl used to fetch SOTA from directly has been
+#     deprecated. Manual sampling of 50 SOTA-sourced spots on 2026-09-06
+#     found sig_refs[].sig == "SOTA" on all 50 (0 blank) -- no fallback
+#     needed, unlike GMA. gen_onta.pl's own SOTA fetch has been removed to
+#     match; this is now the sole SOTA source. Re-verify this sig
+#     reliability holds if SOTA spots ever look sparse/missing -- one
+#     sample isn't as strong evidence as the two-pull GMA finding above.
+#
+#     LOCATION SOURCE FOR SOTA IS THE STATIC SUMMIT CSV, NOT SPOTHOLE'S
+#     OWN dx_grid/dx_latitude/dx_longitude: this mirrors what gen_onta.pl
+#     did before it lost its SOTA block -- the old SOTAwatch spot payload
+#     never carried lat/lng at all, so sota_summits.csv (built by
+#     update_sota_cache.pl from storage.sota.org.uk/summitslist.csv, a
+#     separate static reference endpoint unaffected by the api2.sota.org.uk
+#     deprecation) was always the sole source of SOTA location, keyed by
+#     the exact same "ASSOC/SUMMIT-NNN" reference format Spothole's own
+#     sig_refs[].id uses. A summit's position is fixed -- it doesn't move
+#     -- so that cached reference position is treated as authoritative and
+#     preferred over Spothole's own per-spot dx_grid/dx_latitude/
+#     dx_longitude (which are themselves reportedly derived per spot, see
+#     "dx_location_source": "SPOT" in sampled records, not guaranteed to
+#     be the actual summit coordinates). Spothole's own fields are used
+#     only as a fallback, for a summit not yet in the cached CSV. No other
+#     org here (GMA/LLOTA/TOWERS/WWBOTA) has an equivalent reference CSV,
+#     so none of them get this treatment.
+#   - Towers: this is what the "Towers" `source` seen in the original
+#     2026-08-19 sampling turns out to be -- a sample record has
+#     sig_refs[].sig == "Towers", ref_type "TOWER", and a comment
+#     literally containing "TOTA" (Towers on the Air). Cleanly tagged, no
+#     fallback needed. NOTE: matched sig comes back as "Towers" (mixed
+#     case) from Spothole; the org-matching logic below uc()s everything
+#     so this doesn't matter for matching, but it does mean rows get
+#     written out with org=TOWERS -- the client's ontaOrgMarkerColor()
+#     lookup is case-insensitive (strcasecmp) so this is fine as long as
+#     that table has a "Towers"-or-any-case entry.
+#   - WWBOTA (World Wide Bunkers On The Air): explicitly listed above as
+#     NEVER appearing in the original 2026-08-19 sampling (0 across ~1400
+#     spots) -- it's now live, confirmed via a 2026-09-06 sample with
+#     sig_refs[].sig == "WWBOTA" and ref_type "BUNKER", cleanly tagged.
+#     Volume is very low (2 spots in a ~1200-spot sample), so don't be
+#     surprised if this org rarely shows anything -- that's expected
+#     scarcity, not a bug. Reconfirm tagging stays clean on a broader
+#     sample if it's ever suspected of going quiet or misbehaving.
+#
+#  STILL DELIBERATELY EXCLUDED:
 #   - "ParksNPeaks" is a relay site, not a programme of its own -- it
 #     re-shares POTA/SOTA/WWFF activity under those programmes' own,
-#     correctly-set sig tags, so it needs no special handling here: those
-#     spots are naturally excluded already because POTA/SOTA/WWFF aren't
-#     in TARGET_ORGS (gen_onta.pl already covers them from each
-#     programme's own native API).
+#     correctly-set sig tags (confirmed again in the 2026-09-06 sample:
+#     ParksNPeaks-sourced spots came through with sig="SOTA" and real
+#     SOTA summit refs), so it needs no special handling here. Those
+#     spots are already picked up automatically via the SOTA entry above
+#     (matching is on sig_refs[].sig, not top-level "source") -- adding
+#     "ParksNPeaks" itself as an org would double-count them under a
+#     fake programme name.
+#   - "Cluster" is the same pattern as ParksNPeaks: plain DX cluster spots
+#     that Spothole auto-classified under a real programme's sig (WWFF, in
+#     the 2026-09-06 sample). Not a programme itself, not added.
+#   - "Tiles" appeared in the 2026-09-06 sample with sig_refs[].sig ==
+#     "Tiles" but ref_type "GRID" and a bare 6-character grid locator as
+#     the "id" (e.g. "FN42EL") -- not a park/summit/tower/bunker reference
+#     tied to any identified award programme. Genuinely unclear whether
+#     this is a real "chase the grid square" scheme or just Spothole's own
+#     catch-all bucket for spots with a location but no recognized award
+#     reference. Deliberately left out of TARGET_ORGS pending investigation
+#     into what "Tiles" actually is -- same "unresolved, don't guess"
+#     treatment Towers got in the original version of this file.
 #   - LLOTA (lighthouses) IS in TARGET_ORGS below since it appeared live
 #     and, per prior sig_refs testing patterns, had no reason to expect the
 #     same blank-sig problem GMA has -- reconfirm this holds once real
@@ -113,6 +171,7 @@ use warnings;
 use LWP::UserAgent;
 use JSON qw(decode_json);
 use URI;
+use Text::CSV_XS;
 use File::Copy qw(move);
 
 # Spothole API v2. See https://spothole.app/apidocs for schema (JS-rendered
@@ -121,11 +180,12 @@ my $SPOTHOLE_BASE = 'https://spothole.app/api/v2/spots';
 
 # ---------------------------------------------------------------------------
 # Orgs we actually want out of this one broad fetch. CONFIRMED LIVE on the
-# public spothole.app instance via manual sampling on 2026-08-19 (see header
-# comment for the exact command + result). Re-run that sampling periodically
-# -- Spothole's enabled sources are the server owner's choice and can change.
+# public spothole.app instance via manual sampling on 2026-08-19 (GMA,
+# LLOTA) and 2026-09-06 (SOTA, TOWERS, WWBOTA) -- see header comment for
+# the exact commands + results. Re-run that sampling periodically --
+# Spothole's enabled sources are the server owner's choice and can change.
 # ---------------------------------------------------------------------------
-my @TARGET_ORGS = qw(GMA LLOTA);
+my @TARGET_ORGS = qw(GMA LLOTA SOTA TOWERS WWBOTA);
 
 # ---------------------------------------------------------------------------
 # Orgs where the primary "does any sig_refs[] entry say sig=X" match is
@@ -139,6 +199,104 @@ my %SOURCE_FALLBACK = (
 
 my $OUT = '/opt/hamclock-backend/htdocs/ham/HamClock/ONTA/xonta_spots.txt';
 my $TMP = '/opt/hamclock-backend/htdocs/tmp/xonta_spots.txt.tmp';
+
+# ---------------------------------------------------------------------------
+# Static SOTA summit reference data -- see the big SOTA comment in the
+# header for why this exists and why it's preferred over Spothole's own
+# per-spot location fields. Same file gen_onta.pl's SOTA block used to
+# read, same generator script, just relocated here.
+# ---------------------------------------------------------------------------
+my $SOTA_CSV           = '/opt/hamclock-backend/cache/sota_summits.csv';
+my $SOTA_CSV_GENERATOR = '/opt/hamclock-backend/scripts/update_sota_cache.pl';
+
+# ---------------------------------------------------------------------------
+# Load a reference lookup CSV into a hash keyed by reference string.
+# Required columns: reference, latitude, longitude, grid. Ported verbatim
+# from gen_onta.pl's load_lookup() (see that script if this ever needs to
+# support a location/state column too -- sota_summits.csv doesn't have
+# one, so that part is dead weight here, but kept for parity/low risk).
+# ---------------------------------------------------------------------------
+my @LOC_COLS = qw(locationDesc state region);
+
+sub load_lookup {
+    my ($path) = @_;
+    my %park;
+
+    return %park unless -f $path;
+
+    open my $fh, '<:encoding(UTF-8)', $path or do {
+        warn "Cannot read $path: $!\n";
+        return %park;
+    };
+
+    my $csv = Text::CSV_XS->new({ binary => 1, auto_diag => 1 });
+
+    my $header = $csv->getline($fh);
+    unless ($header && @$header) {
+        warn "Empty or unreadable header in $path\n";
+        close $fh;
+        return %park;
+    }
+
+    my %idx;
+    for my $i (0 .. $#$header) {
+        my $k = $header->[$i] // next;
+        $k =~ s/^"|"$//g;
+        $idx{$k} = $i;
+    }
+
+    for my $need (qw(reference latitude longitude grid)) {
+        unless (exists $idx{$need}) {
+            warn "Missing '$need' column in $path\n";
+            close $fh;
+            return %park;
+        }
+    }
+
+    my ($loc_col) = grep { exists $idx{$_} } @LOC_COLS;
+
+    while (my $row = $csv->getline($fh)) {
+        my $ref = $row->[$idx{reference}] // next;
+        $ref =~ s/^"|"$//g;
+
+        $park{$ref} = {
+            lat  => ($row->[$idx{latitude}]  // ''),
+            lng  => ($row->[$idx{longitude}] // ''),
+            grid => ($row->[$idx{grid}]      // ''),
+            loc  => ($loc_col ? ($row->[$idx{$loc_col}] // '') : ''),
+        };
+    }
+
+    close $fh;
+    return %park;
+}
+
+unless (-e $SOTA_CSV) {
+    print "Missing $SOTA_CSV. Running $SOTA_CSV_GENERATOR...\n";
+    system("perl $SOTA_CSV_GENERATOR");
+    if ($? != 0 || !-e $SOTA_CSV) {
+        print "Error: Failed to generate $SOTA_CSV using $SOTA_CSV_GENERATOR (Exit code: $?). Continuing.\n";
+    }
+}
+my %sota_lookup = load_lookup($SOTA_CSV);
+
+# ---------------------------------------------------------------------------
+# Look up a SOTA summit's authoritative fixed position. Returns
+# ('', undef, undef) if the summit isn't in the cached list -- caller
+# falls back to Spothole's own per-spot location fields in that case.
+# ---------------------------------------------------------------------------
+sub resolve_sota_location {
+    my ($ref) = @_;
+    return ('', undef, undef) unless $ref && exists $sota_lookup{$ref};
+    my $e = $sota_lookup{$ref};
+    my $lat = $e->{lat};
+    my $lng = $e->{lng};
+    return (
+        $e->{grid} // '',
+        (defined($lat) && length($lat) ? $lat + 0 : undef),
+        (defined($lng) && length($lng) ? $lng + 0 : undef),
+    );
+}
 
 # HamClock rejects callsigns longer than 12 characters -- same bound gen_onta.pl/gen_iota.pl use
 my $MAX_CALL = 12;
@@ -174,6 +332,7 @@ my %best;                 # dedup key -> row hashref, same pattern as gen_iota.p
 my %counts;                # org -> count, for the summary print at the end
 my %sig_hits;              # org -> count matched via sig_refs (the "good" path)
 my %fallback_hits;         # org -> count matched via source fallback (the "iffy" path)
+my ($sota_csv_hits, $sota_spot_hits) = (0, 0);  # SOTA location source breakdown
 
 # ---------------------------------------------------------------------------
 # One broad request: no ?sig= filter at all, since that's the exact thing
@@ -263,11 +422,27 @@ for my $s (@$spots) {
     my $ref = clean_field($sig_ref->{id});
     next unless length $ref;
 
-    # prefer the spot's own resolved dx_grid/lat/lng (what a map pane should use),
-    # falling back to the sig_ref's own location if those are somehow blank
-    my $grid = clean_field($s->{dx_grid} // $sig_ref->{grid} // '');
-    my $lat  = $s->{dx_latitude}  // $sig_ref->{latitude};
-    my $lng  = $s->{dx_longitude} // $sig_ref->{longitude};
+    # For SOTA, the fixed summit position from sota_summits.csv is treated
+    # as authoritative and preferred over Spothole's own per-spot location
+    # fields -- see the big SOTA comment in the header for why. Falls back
+    # to Spothole's own dx_grid/dx_latitude/dx_longitude (or the sig_ref's
+    # own location) if the summit isn't in the cached list yet.
+    my ($grid, $lat, $lng);
+    if ($org eq 'SOTA') {
+        my ($csv_grid, $csv_lat, $csv_lng) = resolve_sota_location($ref);
+        if (length($csv_grid) || (defined($csv_lat) && defined($csv_lng))) {
+            ($grid, $lat, $lng) = ($csv_grid, $csv_lat, $csv_lng);
+            $sota_csv_hits++;
+        }
+    }
+    if (!defined $grid) {
+        # prefer the spot's own resolved dx_grid/lat/lng (what a map pane should use),
+        # falling back to the sig_ref's own location if those are somehow blank
+        $grid = clean_field($s->{dx_grid} // $sig_ref->{grid} // '');
+        $lat  = $s->{dx_latitude}  // $sig_ref->{latitude};
+        $lng  = $s->{dx_longitude} // $sig_ref->{longitude};
+        $sota_spot_hits++ if $org eq 'SOTA';
+    }
 
     # HamClock's onta.txt reader requires a grid OR a non-zero lat/lng pair
     next unless length($grid) || (defined($lat) && defined($lng) && ($lat != 0 || $lng != 0));
@@ -319,4 +494,6 @@ for my $org (@TARGET_ORGS) {
     printf "%-8s records: %d  (via sig: %d, via source fallback: %d)\n",
         $org, ($counts{$org} // 0), ($sig_hits{$org} // 0), ($fallback_hits{$org} // 0);
 }
+printf "SOTA location source: %d from sota_summits.csv, %d from Spothole's own fields\n",
+    $sota_csv_hits, $sota_spot_hits;
 print "Total unique spots written to $OUT: " . scalar(@out) . "\n";

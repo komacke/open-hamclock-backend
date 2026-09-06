@@ -10,14 +10,21 @@
 #   #####   #     #  ######
 #
 #  Open HamClock Backend (OHB)
-#  gen_onta.pl -- POTA / SOTA / WWFF on-the-air spot aggregator
+#  gen_onta.pl -- POTA / WWFF on-the-air spot aggregator
 #
 #  Part of the OHB project:
 #  https://github.com/openhamclock/open-hamclock-backend/tree/main
 #
-#  Aggregates spots from POTA, SOTA, and WWFF. This script deduplicates
+#  Aggregates spots from POTA and WWFF. This script deduplicates
 #  activations, resolves location data from cached reference CSVs, and
 #  produces the onta.txt file consumed by HamClock.
+#
+#  SOTA NOTE: SOTA used to be fetched here directly from the official
+#  SOTAwatch API (api2.sota.org.uk), but that API has been deprecated.
+#  SOTA is now sourced via gen_xonta.pl instead (Spothole's API), which
+#  was confirmed by manual sampling on 2026-09-06 to reliably tag SOTA
+#  spots with a proper sig_refs[].sig -- see that script's own header
+#  comment for the full reasoning. Removed from this script 2026-09-06.
 #
 #  WWFF NOTE: Per request from Mario, DL4MFM (https://www.cqgma.org),
 #  the GMA WWFF API is rate limited to 1 req/min and 1440 req/day per
@@ -57,8 +64,11 @@ use Text::CSV_XS;
 use File::Copy qw(move);
 
 my $POTA_URL = 'https://api.pota.app/spot';
-my $SOTA_URL = 'https://api2.sota.org.uk/api/spots/-1?filter=all';
 
+# NOTE: SOTA used to be fetched here directly from api2.sota.org.uk, but that
+# API has been deprecated. SOTA is now sourced via gen_xonta.pl (Spothole),
+# which reliably tags SOTA spots with a proper sig_refs[].sig -- see that
+# script's header comment. Removed 2026-09-06.
 
 # WWFF source: Managed locally by fetch_wwff_cache.pl.
 my $WWFF_URL = '/opt/hamclock-backend/htdocs/ham/HamClock/ONTA/wwff_spots.json';
@@ -73,12 +83,10 @@ my $PARKS_OUT = '/opt/hamclock-backend/htdocs/ham/HamClock/ONTA/onta_parks.txt';
 my $PARKS_TMP = '/opt/hamclock-backend/htdocs/tmp/onta_parks.txt.tmp';
 
 my $POTA_CSV = '/opt/hamclock-backend/cache/all_parks_ext.csv';
-my $SOTA_CSV = '/opt/hamclock-backend/cache/sota_summits.csv';
 my $WWFF_CSV = '/opt/hamclock-backend/cache/wwff_parks.csv';
 
 my %csv_generators = (
     $POTA_CSV => '/opt/hamclock-backend/scripts/update_pota_parks_cache.sh',
-    $SOTA_CSV => '/opt/hamclock-backend/scripts/update_sota_cache.pl',
     $WWFF_CSV => '/opt/hamclock-backend/scripts/update_wwff_cache.pl',
 );
 
@@ -87,8 +95,7 @@ my $MAX_CALL  = 12;
 # HamClock's ONTA age selector maxes out at 60 min (10/20/40/60), so it
 # discards anything older regardless. Bound the feed at 65 min: just past
 # HamClock's max so its selector stays the real filter, with ~5 min margin
-# to cover the rebuild interval. (SOTA is already capped at 60 min by its
-# spots/-1 API window; this mainly trims POTA and WWFF.)
+# to cover the rebuild interval.
 my $MAX_AGE_S = 3900;
 
 sub org_from_ref {
@@ -113,6 +120,21 @@ sub clean_field {
     $v =~ s/,+/ /g;                  # commas would break the CSV
     $v =~ s/\s+/ /g;                 # collapse runs of whitespace
     $v =~ s/^\s+|\s+$//g;            # trim
+    return $v;
+}
+
+# ---------------------------------------------------------------------------
+# Sanitize a frequency field before numeric use. Upstream WWFF/GMA API has
+# been observed to prefix QRG values with stray junk, e.g. ":   5354.0" or
+# "p:  14308.", which numifies to 0 in Perl and silently fails the
+# "$freq > 0" sanity check further down -- discarding an otherwise valid
+# spot. Strip anything that isn't a digit, a decimal point, or a leading
+# minus sign, then let the caller re-validate the result.
+# ---------------------------------------------------------------------------
+sub clean_freq {
+    my ($v) = @_;
+    return '' unless defined $v;
+    $v =~ s/[^0-9.\-]//g;
     return $v;
 }
 
@@ -234,12 +256,11 @@ foreach my $file (keys %csv_generators) {
     }
 }
 my %pota_lookup = load_lookup($POTA_CSV);
-my %sota_lookup = load_lookup($SOTA_CSV);
 my %wwff_lookup = load_lookup($WWFF_CSV);
 
-# Merge into one hash; POTA takes precedence over WWFF, WWFF over SOTA
-# for any ref that somehow appears in multiple sources.
-my %park_lookup = (%sota_lookup, %wwff_lookup, %pota_lookup);
+# Merge into one hash; POTA takes precedence over WWFF for any ref that
+# somehow appears in both sources.
+my %park_lookup = (%wwff_lookup, %pota_lookup);
 
 my $ua = LWP::UserAgent->new(
     timeout => 10,
@@ -248,7 +269,7 @@ my $ua = LWP::UserAgent->new(
 
 my $now = time();
 my %best;   # dedup key -> row hashref
-my %counts = ( pota => 0, sota => 0, wwff => 0 );
+my %counts = ( pota => 0, wwff => 0 );
 
 # ---------------------------------------------------------------------------
 # Helper: attempt to resolve location for a park/summit reference.
@@ -351,91 +372,18 @@ sub resolve_state {
 }
 
 # ---------------------------------------------------------------------------
-# Source 2: SOTA via the official SOTAwatch API
-#           (https://api2.sota.org.uk/api/spots/-<hours>?filter=all)
-# Returns a bare JSON array of spot objects. Fields (camelCase):
-#   activatorCallsign, frequency (MHz, STRING e.g. "14.285"), mode,
-#   associationCode ("DM") + summitCode ("BM-362") -- the full SOTA
-#   reference is "associationCode/summitCode" (e.g. "DM/BM-362");
-#   timeStamp ("YYYY-MM-DDTHH:MM:SS" UTC, no zone suffix in practice).
-#   NOTE: spotter is in "callsign" (may be RBNHOLE/auto-spot); the
-#   activator we actually want is always in "activatorCallsign".
-# ---------------------------------------------------------------------------
-{
-    my $body = fetch_source($SOTA_URL, $ua, 'SOTA');
-    if (defined $body) {
-        my $spots = eval { decode_json($body) };
-        if ($@) {
-            warn "SOTA API JSON parse failed: $@\n";
-        } elsif (ref $spots eq 'ARRAY') {
-            for my $s (@$spots) {
-                next unless ref $s eq 'HASH';
-
-                # Skip test posts if a "type" field is ever present
-                # (current API omits it, so this is a harmless no-op).
-                next if uc($s->{type} // '') eq 'TEST';
-
-                my $call = clean_field($s->{activatorCallsign}); next unless length $call;
-                next if length($call) > $MAX_CALL;
-                my $freq = $s->{frequency}   // next;   # MHz (string, e.g. "14.285")
-                my $mode = clean_field($s->{mode});
-                my $time = $s->{timeStamp}   // next;
-
-                # Build the full summit reference the cache CSV is keyed on.
-                # The API splits it: associationCode="DM", summitCode="BM-362"
-                # -> reference "DM/BM-362". Guard in case either field ever
-                # already carries the prefix.
-                my $assoc  = clean_field($s->{associationCode});
-                my $summit = clean_field($s->{summitCode});
-                next unless length $summit;
-                my $park = ($summit =~ m{/}) ? $summit
-                         : (length $assoc ? "$assoc/$summit" : $summit);
-
-                # Parse "YYYY-MM-DDTHH:MM:SS" (ignore fractional seconds + Z)
-                my ($Y,$m,$d,$H,$M,$S) =
-                    $time =~ /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})/
-                    or next;
-
-                my $epoch = timegm($S,$M,$H,$d,$m-1,$Y);
-                next if ($now - $epoch) > $MAX_AGE_S;
-
-                next unless length($freq) && $freq > 0;
-                my $hz = int($freq * 1_000_000 + 0.5);
-                next unless $hz > 0 && $hz <= 1_300_000_000;
-
-                my ($grid, $lat, $lng) = resolve_location($park);
-                next unless $grid || ($lat != 0 && $lng != 0);
-
-                my $state = resolve_state($park);
-
-                my $key = join('|', $call, $park, $mode, $hz, 'SOTA');
-
-                if (!exists $best{$key} || $epoch > $best{$key}{epoch}) {
-                    $best{$key} = {
-                        call  => $call,
-                        hz    => $hz,
-                        epoch => $epoch,
-                        mode  => $mode,
-                        grid  => $grid,
-                        lat   => $lat,
-                        lng   => $lng,
-                        park  => $park,
-                        org   => 'SOTA',
-                        state => $state,
-                    };
-                    $counts{sota}++;
-                }
-            }
-        }
-    }
-}
-
-# ---------------------------------------------------------------------------
-# Source 3: WWFF — Read from the local cache file populated by
+# Source 2: WWFF — Read from the local cache file populated by
 # fetch_wwff_cache.pl.
 # Fields: ACTIVATOR, QRG (MHz), MODE, REF, LAT, LON, DATE ("YYYYMMDD"),
 #         TIME ("HHMM" UTC)
 # Location is embedded in each spot — no cache lookup needed.
+#
+# NOTE: most genuine WWFF-network spots come through with MODE == "" --
+# only the small subset of GMA "self-spot" records happen to carry a mode
+# string. We no longer require a mode to be present (POTA/SOTA don't
+# either), and QRG is sanitized before numeric use since the upstream API
+# has been observed to prefix it with stray junk (e.g. ":  5354.0" or
+# "p:  14308.") that would otherwise numify to 0 and get silently dropped.
 # ---------------------------------------------------------------------------
 {
     my $body = fetch_source($WWFF_URL, $ua, 'WWFF');
@@ -452,9 +400,10 @@ sub resolve_state {
             next unless length $call;
             next if length($call) > $MAX_CALL;
 
-            my $freq = $s->{QRG}  // next;   # kHz
+            my $freq = clean_freq($s->{QRG});   # kHz, sanitized
             my $mode = uc(clean_field($s->{MODE}));
-            next unless length $mode;         # skip spots with no mode
+            # NOTE: intentionally NOT requiring a non-empty mode here --
+            # see comment above the WWFF block.
 
             my $park = clean_field($s->{REF}); next unless length $park;
             my $lat  = $s->{LAT}  // next;
@@ -561,7 +510,6 @@ move $PARKS_TMP, $PARKS_OUT or die "move failed $PARKS_TMP -> $PARKS_OUT: $!\n";
 
 print "--- Processing Complete ---\n";
 print "POTA records: $counts{pota}\n";
-print "SOTA records: $counts{sota}\n";
 print "WWFF records: $counts{wwff}\n";
 print "WWFF source : $WWFF_URL\n";
 
